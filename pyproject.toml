@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cognis-mcpscan"
+version = "0.1.0"
+description = "Scan MCP servers for RCE/SSRF/no-auth/tool-poisoning vulnerabilities"
+authors = [{name = "Cognis Digital", email = "suite@cognis.digital"}]
+license = {text = "LicenseRef-COCL-1.0"}
+requires-python = ">=3.10"
+readme = "README.md"
+keywords = ["ai-security", "mcp", "mcp-server", "cognis-digital", "cognis-neural-suite", "security"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = []
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.0"]
+dev = ["pytest>=8.0"]
+
+[project.urls]
+Homepage = "https://cognis.digital"
+Repository = "https://github.com/cognis-digital/mcpscan"
+
+[project.scripts]
+mcpscan = "mcpscan.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["mcpscan"]
