@@ -72,7 +72,14 @@ class TestDemoCli(unittest.TestCase):
         self.assertIn("static.subprocess_shell", rules)
         self.assertIn("static.ssrf", rules)
         self.assertIn("static.tool_poisoning", rules)
-        self.assertEqual(data["counts"]["critical"], 4)
+        # Deep detection: AST taint dataflow also fires on the demo's
+        # source->sink flows (command/code/ssrf), so critical count grows.
+        self.assertIn("taint.command_injection", rules)
+        self.assertIn("taint.code_injection", rules)
+        self.assertGreaterEqual(data["counts"]["critical"], 4)
+        # AI is off by default → deterministic, no ai-tagged findings.
+        self.assertFalse(data["ai_used"])
+        self.assertFalse(any(f["source"] == "ai" for f in data["findings"]))
 
     def test_fail_on_high_exits_1(self):
         self.assertEqual(main(["scan", DEMO, "--fail-on", "high"]), 1)

@@ -1,0 +1,124 @@
+name: "mcpscan — MCP / AI-agent security scan"
+description: >-
+  Scan MCP server source for the OWASP LLM Top-10 + MCP/agent threat surface
+  (RCE/SSRF/path-traversal/deserialization/SSTI/secrets/tool-poisoning/
+  confused-deputy/excessive-agency) with AST taint dataflow. Comments findings
+  on the PR and fails the build on a chosen severity. Standard-library only.
+author: "Cognis Digital"
+branding:
+  icon: "shield"
+  color: "purple"
+
+inputs:
+  path:
+    description: "Path (file or directory) of MCP server source to scan."
+    required: false
+    default: "."
+  fail-on:
+    description: "Fail the job if any finding is at/above this severity (critical|high|medium|low|info). Empty = never fail."
+    required: false
+    default: "high"
+  format:
+    description: "Console/report format (table|json|sarif|html|badge)."
+    required: false
+    default: "table"
+  comment-pr:
+    description: "Comment the findings summary on the PR (true|false)."
+    required: false
+    default: "true"
+  ai:
+    description: "Opt-in AI review (requires COGNIS_AI_* env). OFF by default; fail-open if unreachable."
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Run mcpscan
+      id: scan
+      shell: bash
+      env:
+        MCPSCAN_PATH: ${{ inputs.path }}
+        MCPSCAN_FAIL_ON: ${{ inputs.fail-on }}
+        MCPSCAN_FORMAT: ${{ inputs.format }}
+        MCPSCAN_AI: ${{ inputs.ai }}
+        # mcpscan ships in this action's own checkout:
+        ACTION_DIR: ${{ github.action_path }}
+      run: |
+        set -o pipefail
+        export PYTHONPATH="$ACTION_DIR:$PYTHONPATH"
+        AI_FLAG=""
+        if [ "$MCPSCAN_AI" = "true" ]; then AI_FLAG="--ai"; fi
+
+        # Human-readable + JSON (JSON drives the PR comment + the gate).
+        python -m mcpscan scan "$MCPSCAN_PATH" --format "$MCPSCAN_FORMAT" $AI_FLAG | tee mcpscan-console.txt || true
+        python -m mcpscan scan "$MCPSCAN_PATH" --format json   $AI_FLAG --out mcpscan.json || true
+        python -m mcpscan scan "$MCPSCAN_PATH" --format badge  $AI_FLAG --out mcpscan-badge.json || true
+
+        # Build a markdown summary for the PR comment + the job summary.
+        python - "$MCPSCAN_FAIL_ON" <<'PY' > mcpscan-comment.md
+        import json, sys
+        fail_on = (sys.argv[1] or "").strip()
+        try:
+            data = json.load(open("mcpscan.json", encoding="utf-8"))
+        except Exception:
+            print("mcpscan: no report produced."); raise SystemExit(0)
+        c = data["counts"]; fs = data["findings"]
+        print(f"### \U0001F6E1️ mcpscan — {data['score']}/100  "
+              f"(critical {c['critical']}, high {c['high']}, medium {c['medium']}, "
+              f"low {c['low']}, info {c['info']})")
+        print()
+        order = {"critical":0,"high":1,"medium":2,"low":3,"info":4}
+        shown = [f for f in fs if f["severity"] in ("critical","high","medium")][:40]
+        if shown:
+            print("| sev | rule | CWE | OWASP | where | detail |")
+            print("|---|---|---|---|---|---|")
+            for f in shown:
+                src = " `ai`" if f.get("source")=="ai" else ""
+                detail = f["message"].replace("|","\\|")[:160]
+                print(f"| {f['severity']} | `{f['rule']}`{src} | {f.get('cwe','')} | "
+                      f"{f.get('owasp_llm','')} | {f.get('location','')} | {detail} |")
+        else:
+            print("No critical/high/medium findings. ✅")
+        print()
+        print("_Scanned by [mcpscan](https://github.com/cognis-digital/mcpscan) — "
+              "Cognis Neural Suite. Rules mapped to CWE + OWASP LLM Top-10 + "
+              "Microsoft agent-threat taxonomy._")
+        PY
+
+        cat mcpscan-comment.md >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Comment on PR
+      if: ${{ inputs.comment-pr == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        REPO: ${{ github.repository }}
+      run: |
+        if [ -s mcpscan-comment.md ]; then
+          gh api "repos/$REPO/issues/$PR_NUMBER/comments" \
+            -f body="$(cat mcpscan-comment.md)" || \
+            echo "mcpscan: could not post PR comment (insufficient permissions?)"
+        fi
+
+    - name: Enforce severity gate
+      shell: bash
+      env:
+        MCPSCAN_PATH: ${{ inputs.path }}
+        MCPSCAN_FAIL_ON: ${{ inputs.fail-on }}
+        MCPSCAN_AI: ${{ inputs.ai }}
+        ACTION_DIR: ${{ github.action_path }}
+      run: |
+        if [ -z "$MCPSCAN_FAIL_ON" ]; then
+          echo "mcpscan: no fail-on threshold; not gating."; exit 0
+        fi
+        export PYTHONPATH="$ACTION_DIR:$PYTHONPATH"
+        AI_FLAG=""
+        if [ "$MCPSCAN_AI" = "true" ]; then AI_FLAG="--ai"; fi
+        python -m mcpscan scan "$MCPSCAN_PATH" --fail-on "$MCPSCAN_FAIL_ON" $AI_FLAG --format badge

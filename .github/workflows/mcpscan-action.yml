@@ -1,0 +1,40 @@
+# mcpscan — reusable GitHub Action workflow.
+#
+# Drop this file into your MCP server repo at
+#   .github/workflows/mcpscan-action.yml
+# and every push / PR is scanned for the OWASP LLM Top-10 + MCP/agent threat
+# surface. Findings are summarized in the job summary and posted as a PR
+# comment; the build fails on `fail-on` severity.
+#
+# Minimal consumer usage (just the `uses:` line is enough):
+#
+#   - uses: cognis-digital/mcpscan@main
+#     with:
+#       path: .
+#       fail-on: high
+#
+name: mcpscan
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write   # needed so mcpscan can comment findings on the PR
+
+jobs:
+  mcpscan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: mcpscan — MCP / AI-agent security scan
+        uses: cognis-digital/mcpscan@main
+        with:
+          path: .
+          fail-on: high
+          comment-pr: "true"
+          # ai: "false"   # opt-in; set COGNIS_AI_* env to enable the AI layer

@@ -27,3 +27,8 @@ jobs:
         run: |
           python -m mcpscan --version
           python -m mcpscan scan demos/01-basic/vulnerable_mcp_server.py --format json
+          python -m mcpscan scan demos/02-deep/vulnerable_agent_server.py --format json
+          python -m mcpscan scan demos/02-deep/ --format html --out /tmp/r.html
+          python -m mcpscan scan demos/02-deep/ --format badge
+          # --ai with no backend configured must still succeed on rules only:
+          python -m mcpscan scan demos/02-deep/ --ai --format json
