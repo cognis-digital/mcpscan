@@ -43,6 +43,23 @@ a remote GitHub URL, and via an **opt-in AI review layer**.
   an inbound `Authorization` header or token to a downstream call), **excessive
   agency** (unconfirmed destructive tools), and **rug-pull / version drift**
   (unpinned `requirements.txt` / floating `package.json` deps).
+- **Shell tool runs user input** — a tool/function that feeds one of its own
+  parameters into a shell subprocess (`subprocess(..., shell=True)`,
+  `os.system`/`os.popen`) is flagged `static.shell_tool_input` (`CWE-78`,
+  OWASP-LLM `LLM06`) via a confined per-function AST pass.
+
+**MCP config hygiene** (JSON client/server config — `.mcp.json`, `mcp.json`,
+`claude_desktop_config.json`, …, auto-discovered by `scan`):
+
+- **Hard-coded bearer / secret in config** — a baked-in credential in a
+  server's `env`, `headers`, or `args` (`config.hardcoded_secret`, `CWE-798`,
+  `LLM02`). Env-var placeholders (`${VAR}`) are recognized as clean.
+- **Server bound to `0.0.0.0` with no auth** — a listener on all interfaces
+  with no authentication in the same file (`config.open_bind_no_auth`,
+  `CWE-306`, `LLM06`).
+- **Remote transport without TLS** — a non-loopback MCP transport URL over
+  cleartext `http://` (`config.no_tls_remote`, `CWE-319`, `LLM02`); loopback
+  and `https://` are clean.
 
 **Live** (probe a running HTTP MCP endpoint over `urllib`):
 
@@ -71,6 +88,7 @@ Standard-library only — no runtime dependencies.
 mcpscan --version
 mcpscan scan demos/01-basic/                                  # static scan a dir
 mcpscan scan demos/02-deep/                                   # deep rule pack + taint
+mcpscan scan demos/03-config/                                 # MCP config hygiene + shell-tool input
 mcpscan scan path/to/server.py --format sarif --out r.sarif   # SARIF for code-scanning
 mcpscan scan path/to/server.py --format html  --out r.html    # self-contained HTML report
 mcpscan scan path/to/server.py --format badge                 # shields.io endpoint JSON

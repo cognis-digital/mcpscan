@@ -44,7 +44,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 TOOL_NAME = "mcpscan"
-TOOL_VERSION = "0.2.0"
+TOOL_VERSION = "0.3.0"
 
 # Severity ordering, highest first. Used for sorting + --fail-on policy.
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
@@ -118,6 +118,23 @@ RULE_META: Dict[str, Dict[str, str]] = {
         "cwe": "CWE-79", "owasp_llm": "LLM05",
         "ms_taxonomy": "agent-knowledge-poisoning",
         "title": "Insecure handling of LLM/tool output"},
+    # --- v0.3 deep rules: MCP config hygiene + shell-tool taint ---
+    "config.hardcoded_secret": {
+        "cwe": "CWE-798", "owasp_llm": "LLM02",
+        "ms_taxonomy": "agent-knowledge-poisoning",
+        "title": "Hard-coded bearer/secret in MCP config"},
+    "config.open_bind_no_auth": {
+        "cwe": "CWE-306", "owasp_llm": "LLM06",
+        "ms_taxonomy": "agent-impersonation",
+        "title": "Server bound to 0.0.0.0 with no authentication"},
+    "config.no_tls_remote": {
+        "cwe": "CWE-319", "owasp_llm": "LLM02",
+        "ms_taxonomy": "agent-impersonation",
+        "title": "Remote MCP transport without TLS (cleartext http://)"},
+    "static.shell_tool_input": {
+        "cwe": "CWE-78", "owasp_llm": "LLM06",
+        "ms_taxonomy": "agent-excessive-agency",
+        "title": "Shell tool passes user input to a subprocess"},
     "static.parse_error": {
         "cwe": "", "owasp_llm": "", "ms_taxonomy": "",
         "title": "Parser error (fell back to regex)"},
@@ -844,7 +861,10 @@ def scan_python_source(path: str, source: str) -> List[Finding]:
     v.visit(tree)
     findings = list(v.findings)
     findings.extend(_taint_findings(path, tree, source))
+    findings.extend(_scan_shell_tool_input(path, tree))
     findings.extend(_scan_secrets(path, source))
+    findings.extend(scan_open_bind(path, source))
+    findings.extend(scan_no_tls_remote(path, source))
     return findings
 
 
@@ -988,6 +1008,316 @@ def _scan_manifest(path: str, source: str) -> List[Finding]:
 
 
 # ==========================================================================
+# v0.3 — MCP config hygiene rules (JSON client/server config files)
+# ==========================================================================
+
+# Config file basenames that hold MCP client/server wiring (env, headers,
+# args, transport URLs). These are NOT package manifests.
+_CONFIG_NAMES = {
+    ".mcp.json", "mcp.json", "mcp_config.json", "mcpservers.json",
+    "claude_desktop_config.json", "claude_config.json",
+}
+
+# Key names whose value is expected to be a credential.
+_SECRET_KEY_RE = re.compile(
+    r"(?i)(authorization|bearer|api[_-]?key|apikey|secret|token|password|"
+    r"passwd|access[_-]?key|client[_-]?secret|private[_-]?key)")
+
+# Value that is merely an env-var placeholder ( ${VAR}, $VAR, %VAR% ) — not a
+# baked-in literal, so it must NOT be flagged.
+_ENV_PLACEHOLDER_RE = re.compile(r"^\s*(\$\{[^}]+\}|\$[A-Za-z_][\w]*|%[^%]+%)\s*$")
+
+# A literal that actually looks like a credential value (>=12 chars of token
+# alphabet, or a "Bearer <token>" string). Avoids flagging short flags/words.
+_LITERAL_SECRET_RE = re.compile(r"^[A-Za-z0-9/+_.\-]{12,}={0,2}$")
+
+
+def _is_placeholder(val: str) -> bool:
+    return bool(_ENV_PLACEHOLDER_RE.match(val))
+
+
+def _looks_like_secret_value(val: str) -> bool:
+    """True if a *string value* looks like a baked-in credential (not a
+    placeholder, not a short token, or an explicit ``Bearer <token>``)."""
+    if not isinstance(val, str):
+        return False
+    v = val.strip()
+    if not v or _is_placeholder(v):
+        return False
+    bearer = re.match(r"(?i)^(bearer|token)\s+(\S+)", v)
+    if bearer:
+        return not _is_placeholder(bearer.group(2))
+    if _LITERAL_SECRET_RE.match(v) and any(ch.isdigit() for ch in v):
+        return True
+    # any known high-signal secret format counts too
+    return any(pat.search(v) for _, pat in _SECRET_PATTERNS)
+
+
+def _walk_config_servers(data: Any):
+    """Yield (server_label, server_dict) for each MCP server entry, tolerating
+    the common shapes: {"mcpServers": {name: {...}}} and {"servers": {...}}."""
+    if not isinstance(data, dict):
+        return
+    for container_key in ("mcpServers", "servers", "mcp"):
+        block = data.get(container_key)
+        if isinstance(block, dict):
+            for name, srv in block.items():
+                if isinstance(srv, dict):
+                    yield str(name), srv
+    # also allow a top-level single server object
+    if any(k in data for k in ("command", "env", "headers", "url")):
+        yield "<root>", data
+
+
+def scan_config_secret(path: str, source: str) -> List[Finding]:
+    """Flag hard-coded bearer tokens / API keys / secrets baked into an MCP
+    config's ``env`` / ``headers`` / ``args``. Env-var placeholders are clean.
+
+    Drafted by the local fleet; rewritten to skip placeholders robustly, only
+    flag credential-shaped values, and avoid crashing on non-string values."""
+    out: List[Finding] = []
+    try:
+        data = json.loads(source)
+    except (json.JSONDecodeError, ValueError):
+        return out
+    seen: set = set()
+
+    def _flag(where: str, key: str, val: str) -> None:
+        sig = (where, key, val)
+        if sig in seen:
+            return
+        seen.add(sig)
+        out.append(Finding(
+            "config.hardcoded_secret", "high",
+            f"Hard-coded credential in MCP config {where} ('{key}'); a baked-in "
+            "secret leaks to anyone who can read the config and cannot be "
+            "rotated without an edit.",
+            path,
+            "Reference the secret via an environment variable placeholder "
+            "(e.g. \"${MY_TOKEN}\") and inject it at runtime; rotate the "
+            "exposed value.",
+        ))
+
+    for label, srv in _walk_config_servers(data):
+        env = srv.get("env")
+        if isinstance(env, dict):
+            for k, v in env.items():
+                if isinstance(v, str) and (_SECRET_KEY_RE.search(str(k))
+                                           or _looks_like_secret_value(v)):
+                    if _looks_like_secret_value(v):
+                        _flag(f"env of server '{label}'", str(k), v)
+        headers = srv.get("headers")
+        if isinstance(headers, dict):
+            for k, v in headers.items():
+                if not isinstance(v, str):
+                    continue
+                if str(k).lower() == "authorization" or _SECRET_KEY_RE.search(str(k)):
+                    if _looks_like_secret_value(v):
+                        _flag(f"headers of server '{label}'", str(k), v)
+                elif v.lower().startswith("bearer ") and _looks_like_secret_value(v):
+                    _flag(f"headers of server '{label}'", str(k), v)
+        args = srv.get("args")
+        if isinstance(args, list):
+            prev = ""
+            for a in args:
+                if not isinstance(a, str):
+                    prev = ""
+                    continue
+                # `--token SECRET` (prev flag) or `--token=SECRET` (inline)
+                inline = re.match(r"^--?[\w-]*"
+                                  r"(authorization|bearer|api[_-]?key|secret|"
+                                  r"token|password)[\w-]*=(.+)$", a, re.I)
+                if inline and _looks_like_secret_value(inline.group(2)):
+                    _flag(f"args of server '{label}'", a.split("=")[0], a)
+                elif _SECRET_KEY_RE.search(prev) and _looks_like_secret_value(a):
+                    _flag(f"args of server '{label}'", prev, a)
+                prev = a
+    return out
+
+
+# Bind to all interfaces — host="0.0.0.0", run("0.0.0.0", ...), --host 0.0.0.0.
+_BIND_ALL_RE = re.compile(
+    r"""(?ix)
+    (?:
+        \b(?:host|bind|address|hostname)\s*[:=]\s*['"]0\.0\.0\.0['"]   |
+        ['"]0\.0\.0\.0['"]\s*,\s*\d{2,5}                                |  # ("0.0.0.0", 8080)
+        \.run\s*\(\s*['"]0\.0\.0\.0['"]                                 |
+        --(?:host|bind)\s+0\.0\.0\.0                                    |
+        \b0\.0\.0\.0:\d{2,5}\b
+    )
+    """)
+
+# Any sign that auth is being enforced in the same file.
+_AUTH_PRESENT_RE = re.compile(
+    r"(?i)\b(authorization|bearer|verify_token|require_auth|auth_required|"
+    r"api[_-]?key|access[_-]?token|oauth|jwt|HTTPBasic|HTTPBearer|"
+    r"check_token|authenticate|login_required)\b")
+
+
+def scan_open_bind(path: str, source: str) -> List[Finding]:
+    """Flag a listener bound to 0.0.0.0 (all interfaces) when the same file
+    shows no authentication — the server is reachable network-wide with no
+    gate. Drafted by the fleet; widened the bind matcher to cover positional
+    .run("0.0.0.0", ...) / "host:port" / CLI forms and line-precise location."""
+    out: List[Finding] = []
+    if _AUTH_PRESENT_RE.search(source):
+        return out
+    for lineno, line in enumerate(source.splitlines(), start=1):
+        if _BIND_ALL_RE.search(line):
+            out.append(Finding(
+                "config.open_bind_no_auth", "high",
+                "Server binds to 0.0.0.0 (all network interfaces) and no "
+                "authentication is configured in this file; any host that can "
+                "reach the port can drive the MCP server.",
+                f"{path}:{lineno}",
+                "Bind to 127.0.0.1 for local use, or require a bearer "
+                "token / OAuth before serving tools/list and tools/call.",
+            ))
+            break  # one finding per file is enough
+    return out
+
+
+# http:// URL whose host is NOT loopback/all-interfaces (i.e. a real remote).
+_REMOTE_HTTP_RE = re.compile(
+    r"""(?ix)\bhttp://
+        (?P<host>[A-Za-z0-9.\-]+(?::\d+)?)
+        (?P<rest>[^\s'"`)]*)""")
+_LOCAL_HOST_RE = re.compile(
+    r"(?i)^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|::1)(:\d+)?$")
+# context keys that mark a value as an MCP transport / remote endpoint.
+_TRANSPORT_HINT_RE = re.compile(
+    r"(?i)\b(url|uri|endpoint|base[_-]?url|server[_-]?url|transport|sse|"
+    r"baseUrl|serverUrl|host|remote|mcp)\b")
+
+
+def scan_no_tls_remote(path: str, source: str) -> List[Finding]:
+    """Flag a remote (non-loopback) MCP transport configured over plaintext
+    http://. Drafted by the fleet; rewritten to extract the real host, ignore
+    loopback, de-dupe per host, and require transport context so arbitrary
+    doc/comment links don't false-positive."""
+    out: List[Finding] = []
+    has_transport_ctx = bool(_TRANSPORT_HINT_RE.search(source))
+    seen: set = set()
+    for lineno, line in enumerate(source.splitlines(), start=1):
+        for m in _REMOTE_HTTP_RE.finditer(line):
+            host = m.group("host")
+            if _LOCAL_HOST_RE.match(host):
+                continue
+            # require either a transport key on this line, or the file is a
+            # config/transport file overall (avoids flagging prose URLs).
+            line_ctx = _TRANSPORT_HINT_RE.search(line)
+            if not (line_ctx or has_transport_ctx):
+                continue
+            if host in seen:
+                continue
+            seen.add(host)
+            out.append(Finding(
+                "config.no_tls_remote", "medium",
+                f"Remote MCP transport uses cleartext http:// (host '{host}'); "
+                "tokens and tool traffic to a remote server travel unencrypted "
+                "and can be intercepted or tampered with.",
+                f"{path}:{lineno}",
+                "Use https:// for any non-loopback MCP endpoint (or an "
+                "authenticating TLS-terminating proxy).",
+            ))
+    return out
+
+
+def _scan_config(path: str, source: str) -> List[Finding]:
+    """Run all MCP-config-file rules over a JSON config (.mcp.json,
+    claude_desktop_config.json, ...): hard-coded secrets + cleartext remote
+    transport."""
+    out: List[Finding] = []
+    out.extend(scan_config_secret(path, source))
+    out.extend(scan_no_tls_remote(path, source))
+    return out
+
+
+# ==========================================================================
+# v0.3 — shell-tool input flow (AST): an MCP tool param reaches a subprocess
+# ==========================================================================
+
+_SHELL_SINKS = {
+    "os.system", "os.popen", "subprocess.run", "subprocess.call",
+    "subprocess.check_call", "subprocess.check_output", "subprocess.Popen",
+}
+
+
+def _node_uses_param(node: Optional[ast.AST], params: set) -> bool:
+    """True if expression `node` references any of the given parameter names
+    (directly, or through concat / f-string / .format() / str() wrapping)."""
+    if node is None:
+        return False
+    found = False
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Name) and sub.id in params:
+            found = True
+            break
+    return found
+
+
+def _scan_shell_tool_input(path: str, tree: ast.AST) -> List[Finding]:
+    """Flag a tool/function that feeds one of its own parameters into a shell
+    subprocess sink (shell=True, or the param concatenated into the command
+    argument). This is the canonical 'shell tool runs user input' MCP RCE.
+
+    Drafted by the fleet as a regex (broken); reimplemented as a real AST pass
+    that confines the flow to a single function's parameters and the command
+    argument of the sink."""
+    out: List[Finding] = []
+    seen: set = set()
+
+    for fn in ast.walk(tree):
+        if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        params: set = set()
+        for a in list(fn.args.args) + list(fn.args.kwonlyargs):
+            if a.arg not in ("self", "cls"):
+                params.add(a.arg)
+        if fn.args.vararg:
+            params.add(fn.args.vararg.arg)
+        if fn.args.kwarg:
+            params.add(fn.args.kwarg.arg)
+        if not params:
+            continue
+        for call in [n for n in ast.walk(fn) if isinstance(n, ast.Call)]:
+            chain = _name_chain(call.func)
+            bare = chain.split(".")[-1]
+            is_sink = chain in _SHELL_SINKS or (
+                bare == "Popen") or (
+                bare in {"system", "popen"} and "os" in chain) or (
+                bare in {"run", "call", "check_call", "check_output"}
+                and "subprocess" in chain)
+            if not is_sink:
+                continue
+            cmd_arg = _call_arg(call, 0)
+            shelly = _shell_true(call) or bare in {"system", "popen"}
+            param_in_cmd = _node_uses_param(cmd_arg, params)
+            # also catch the param appearing in any positional arg of a
+            # shell=True subprocess call (the command may be arg 0 list/str).
+            if not param_in_cmd and shelly:
+                param_in_cmd = any(_node_uses_param(a, params)
+                                   for a in call.args)
+            if param_in_cmd and (shelly or "os" in chain or
+                                 "subprocess" in chain):
+                loc = f"{path}:{getattr(call, 'lineno', '?')}"
+                if loc in seen:
+                    continue
+                seen.add(loc)
+                out.append(Finding(
+                    "static.shell_tool_input", "critical",
+                    f"Tool '{fn.name}' passes its parameter into {chain}() "
+                    + ("with shell=True " if _shell_true(call) else "")
+                    + "— attacker-controlled MCP tool input reaches a shell "
+                    "(command injection / RCE).",
+                    loc,
+                    "Never build a shell command from tool input: use an argv "
+                    "list with shell=False and validate/allowlist arguments.",
+                ))
+    return out
+
+
+# ==========================================================================
 # Static analysis — directory walk
 # ==========================================================================
 
@@ -1015,7 +1345,8 @@ def scan_path(target: str, *, use_ai: bool = False,
             f for f in p.rglob("*")
             if f.is_file() and (
                 f.suffix in _PY_EXT or f.suffix in _JS_EXT
-                or f.name in _MANIFEST_NAMES)
+                or f.name in _MANIFEST_NAMES
+                or f.name.lower() in _CONFIG_NAMES)
             and "node_modules" not in f.parts and ".git" not in f.parts
         )
 
@@ -1027,6 +1358,9 @@ def scan_path(target: str, *, use_ai: bool = False,
         except OSError:
             continue
         rel = str(f)
+        if f.name.lower() in _CONFIG_NAMES:
+            report.findings.extend(_scan_config(rel, src))
+            continue
         if f.name in _MANIFEST_NAMES and f.suffix not in _JS_EXT:
             report.findings.extend(_scan_manifest(rel, src))
             continue
@@ -1088,7 +1422,9 @@ def scan_url(url: str, *, timeout: float = 10.0, use_ai: bool = False,
     report.files_scanned = 1
     name = fetch.rsplit("/", 1)[-1].split("?")[0]
     suffix = ("." + name.rsplit(".", 1)[-1]) if "." in name else ""
-    if name in _MANIFEST_NAMES:
+    if name.lower() in _CONFIG_NAMES:
+        report.findings.extend(_scan_config(name, src))
+    elif name in _MANIFEST_NAMES:
         report.findings.extend(_scan_manifest(name, src))
     elif suffix in _JS_EXT:
         report.findings.extend(scan_js_source(name, src))

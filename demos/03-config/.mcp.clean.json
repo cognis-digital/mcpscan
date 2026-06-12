@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}",
+        "LOG_LEVEL": "info"
+      }
+    },
+    "remote-tools": {
+      "transport": "sse",
+      "url": "https://tools.example.com/sse",
+      "headers": {
+        "Authorization": "Bearer ${REMOTE_TOKEN}"
+      }
+    },
+    "local": {
+      "transport": "sse",
+      "url": "http://127.0.0.1:8080/sse"
+    }
+  }
+}
