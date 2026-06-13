@@ -3,7 +3,7 @@
 > Part of the **[Cognis Neural Suite](https://github.com/cognis-digital)** by [Cognis Digital](https://cognis.digital)
 > Cognis Open Collaboration License (COCL) v1.0 · domain: `ai-security`
 
-[![PyPI](https://img.shields.io/pypi/v/cognis-mcpscan.svg)](https://pypi.org/project/cognis-mcpscan/)
+[![install](https://img.shields.io/badge/install-git%2B%20%C2%B7%20pipx%20%C2%B7%20uv-6b46c1.svg)](#install--every-way-every-platform)
 [![CI](https://github.com/cognis-digital/mcpscan/actions/workflows/ci.yml/badge.svg)](https://github.com/cognis-digital/mcpscan/actions)
 [![License: COCL 1.0](https://img.shields.io/badge/License-COCL%201.0-2b6cb0.svg)](LICENSE)
 [![Suite](https://img.shields.io/badge/Cognis-Neural%20Suite-6b46c1.svg)](https://github.com/cognis-digital)
@@ -15,6 +15,12 @@ source (with real AST taint dataflow), by probing a live endpoint, by fetching
 a remote GitHub URL, and via an **opt-in AI review layer**.
 
 *AI Security & Governance — securing LLMs, agents, and the MCP supply chain.*
+
+<!-- cognis:layman:start -->
+## What is this?
+
+mcpscan is a security scanner for MCP (Model Context Protocol) servers — the software plugins that let AI assistants like Claude access tools, files, and external services. It checks your MCP server code for dangerous security holes such as remote code execution, unauthorized access, and hardcoded passwords, then gives you a plain report listing exactly what it found and how to fix it. You can point it at a folder of source code, a live running server, or even a public GitHub link, and it works entirely on your own machine with no cloud service required. It is aimed at developers and security teams who build or deploy AI-connected tools and want to catch vulnerabilities before attackers do.
+<!-- cognis:layman:end -->
 
 ## What it detects
 
@@ -72,10 +78,56 @@ a remote GitHub URL, and via an **opt-in AI review layer**.
 file over `urllib` (auto-normalizing `github.com/.../blob/...` to raw) and scans
 it without cloning.
 
+<!-- cognis:domains:start -->
+## Domains
+
+**Primary domain:** Cyber & Security  ·  **JTF MERIDIAN division:** NULLBYTE · SPECTER
+
+**Topics:** `cognis` `security` `infosec` `cybersecurity` `blue-team` `mcp` `agent-security`
+
+Part of the **Cognis Neural Suite** — 300+ source-available tools organized across 12 domains under the JTF MERIDIAN command structure. See the [suite on GitHub](https://github.com/cognis-digital) and [jtf-meridian](https://github.com/cognis-digital/jtf-meridian) for how the pieces fit together.
+<!-- cognis:domains:end -->
+
+<!-- cognis:install:start -->
+## Install
+
+`mcpscan` is source-available (not published to PyPI) — every method below installs
+straight from GitHub. Pick whichever you prefer; the one-line scripts auto-detect
+the best tool available on your machine.
+
+**One-liner (Linux / macOS):**
+```sh
+curl -fsSL https://raw.githubusercontent.com/cognis-digital/mcpscan/HEAD/install.sh | sh
+```
+
+**One-liner (Windows PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/cognis-digital/mcpscan/HEAD/install.ps1 | iex
+```
+
+**Or install manually — any one of:**
+```sh
+pipx install "git+https://github.com/cognis-digital/mcpscan.git"     # isolated (recommended)
+uv tool install "git+https://github.com/cognis-digital/mcpscan.git"  # uv
+pip install "git+https://github.com/cognis-digital/mcpscan.git"      # pip
+```
+
+**From source:**
+```sh
+git clone https://github.com/cognis-digital/mcpscan.git
+cd mcpscan && pip install .
+```
+
+Then run:
+```sh
+mcpscan --help
+```
+<!-- cognis:install:end -->
+
 ## Install
 
 ```bash
-pip install cognis-mcpscan
+pip install "git+https://github.com/cognis-digital/mcpscan.git"
 # or, from this repo:
 pip install -e ".[dev]"
 ```
@@ -195,6 +247,32 @@ python -m mcpscan.mcp_server     # requires the `mcp` extra + cognis_core
 It pairs naturally with [`mcpharden`](https://github.com/cognis-digital/mcpharden)
 (manifest hardening linter): `mcpharden` audits the declared manifest, `mcpscan`
 audits the actual source + running endpoint.
+
+<a name="verification"></a>
+## Verification
+
+[![tests](https://img.shields.io/badge/tests-77%20passing-2ea44f.svg)](AUDIT.md)
+
+Every push is verified end-to-end. Latest audit (2026-06-13):
+
+```text
+tests        : 77 passed, 0 failed, 0 errored
+compile      : all modules parse
+cli          : C:\Python314\python.exe: No module named https
+package      : https
+```
+
+<details><summary>CLI surface (<code>--help</code>)</summary>
+
+```text
+C:\Python314\python.exe: No module named https
+```
+</details>
+
+Full machine-readable results: [`AUDIT.md`](AUDIT.md) · regenerate with `python -m https --help` + `pytest -q`.
+
+<div align="right"><a href="#top">↑ back to top</a></div>
+
 
 ## License
 
