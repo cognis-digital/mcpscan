@@ -16,6 +16,43 @@ a remote GitHub URL, and via an **opt-in AI review layer**.
 
 *AI Security & Governance — securing LLMs, agents, and the MCP supply chain.*
 
+## Usage — step by step
+
+`mcpscan` finds RCE/SSRF/no-auth/tool-poisoning and other vulnerabilities in MCP servers, mapping each finding to the OWASP LLM Top-10, a CWE, and the Microsoft agent-threat taxonomy. It can scan source, a remote URL, or a live endpoint.
+
+1. **Install:**
+
+   ```bash
+   pip install cognis-mcpscan      # or: pip install -e .
+   mcpscan --version
+   ```
+
+2. **Scan source statically** (file or directory of MCP server code). Output formats: `table`, `json`, `sarif`, `html`, `badge`:
+
+   ```bash
+   mcpscan scan ./my-mcp-server --format table
+   ```
+
+3. **Emit a report** for tooling and save it:
+
+   ```bash
+   mcpscan scan ./my-mcp-server --format sarif --out mcpscan.sarif
+   ```
+
+4. **Scan remote / live targets** — pull a GitHub URL, or probe a running endpoint (optionally with a bearer token):
+
+   ```bash
+   mcpscan url https://github.com/org/repo/blob/main/server.py --format json
+   mcpscan probe https://mcp.example.com --token "$TOKEN"
+   ```
+
+5. **Gate it in CI** — fail the build on findings at/above a severity; add the deterministic-by-default opt-in `--ai` review layer when you want LLM triage:
+
+   ```bash
+   mcpscan scan ./my-mcp-server --format sarif --out mcpscan.sarif --fail-on high
+   mcpscan scan ./my-mcp-server --ai --ai-focus "tool poisoning"   # opt-in, non-deterministic
+   ```
+
 ## What it detects
 
 **Static** (point it at a directory/file of MCP server source):
