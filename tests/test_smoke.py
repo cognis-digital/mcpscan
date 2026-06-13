@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from mcpscan import TOOL_NAME, TOOL_VERSION
 from mcpscan.cli import main
-from mcpscan.core import scan_path, scan_python_source
+from mcpscan.core import scan_python_source
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEMO = os.path.join(REPO_ROOT, "demos", "01-basic", "vulnerable_mcp_server.py")

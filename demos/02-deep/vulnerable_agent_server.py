@@ -7,7 +7,6 @@ Covers: insecure deserialization (CWE-502), SSTI (CWE-1336), path traversal
 only real dataflow analysis (not a single-line regex) can catch.
 """
 
-import os
 import pickle
 import subprocess
 
