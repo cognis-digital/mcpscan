@@ -35,3 +35,6 @@ mcpscan = "mcpscan.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["mcpscan"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
