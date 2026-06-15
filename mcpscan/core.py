@@ -1341,14 +1341,17 @@ def scan_path(target: str, *, use_ai: bool = False,
     if p.is_file():
         files = [p]
     else:
-        files = sorted(
-            f for f in p.rglob("*")
-            if f.is_file() and (
-                f.suffix in _PY_EXT or f.suffix in _JS_EXT
-                or f.name in _MANIFEST_NAMES
-                or f.name.lower() in _CONFIG_NAMES)
-            and "node_modules" not in f.parts and ".git" not in f.parts
-        )
+        try:
+            files = sorted(
+                f for f in p.rglob("*")
+                if f.is_file() and (
+                    f.suffix in _PY_EXT or f.suffix in _JS_EXT
+                    or f.name in _MANIFEST_NAMES
+                    or f.name.lower() in _CONFIG_NAMES)
+                and "node_modules" not in f.parts and ".git" not in f.parts
+            )
+        except PermissionError as exc:
+            raise ScanError(f"cannot read directory {target!r}: {exc}") from exc
 
     report = Report(source=str(target), target_kind="source")
     ai_inputs: List[Tuple[str, str]] = []
@@ -1405,6 +1408,8 @@ def scan_url(url: str, *, timeout: float = 10.0, use_ai: bool = False,
     """Fetch a remote public MCP server / repo file and scan its source."""
     if not re.match(r"^https?://", url, re.I):
         raise ScanError("scan-url requires an http(s):// URL")
+    if timeout <= 0:
+        raise ScanError(f"timeout must be a positive number, got {timeout!r}")
     fetch = _normalize_raw_url(url)
     req = urllib.request.Request(fetch, method="GET")
     req.add_header("User-Agent", f"{TOOL_NAME}/{TOOL_VERSION}")
@@ -1414,7 +1419,7 @@ def scan_url(url: str, *, timeout: float = 10.0, use_ai: bool = False,
             raw = resp.read()
     except urllib.error.HTTPError as exc:
         raise ScanError(f"could not fetch {fetch}: HTTP {exc.code}") from exc
-    except (urllib.error.URLError, socket.timeout, OSError) as exc:
+    except (urllib.error.URLError, socket.timeout, OSError, ValueError) as exc:
         raise ScanError(f"could not fetch {fetch}: {exc}") from exc
 
     src = raw.decode("utf-8", errors="replace")
@@ -1560,6 +1565,8 @@ def probe_endpoint(url: str, token: Optional[str] = None,
 
     if not re.match(r"^https?://", url, re.I):
         raise ScanError("endpoint must be an http(s):// URL")
+    if timeout <= 0:
+        raise ScanError(f"timeout must be a positive number, got {timeout!r}")
 
     try:
         anon_status, body = _jsonrpc(url, "tools/list", headers=None,
@@ -1569,7 +1576,7 @@ def probe_endpoint(url: str, token: Optional[str] = None,
             status, body = _jsonrpc(
                 url, "tools/list",
                 headers={"Authorization": f"Bearer {token}"}, timeout=timeout)
-    except (urllib.error.URLError, socket.timeout, OSError) as exc:
+    except (urllib.error.URLError, socket.timeout, OSError, ValueError) as exc:
         raise ScanError(f"could not reach endpoint: {exc}") from exc
 
     tools = _extract_tools(body)
@@ -1750,7 +1757,6 @@ def to_html(report: Report) -> str:
         report.target_kind, "source")
     rows = []
     for f in report.findings:
-        m = _meta(f.rule)
         tags = []
         if f.cwe:
             tags.append(e(f.cwe))
@@ -1762,7 +1768,7 @@ def to_html(report: Report) -> str:
             tags.append("AI")
         if f.novel:
             tags.append("NOVEL")
-        badge = (f'<span class="src ai">AI</span>' if f.source == "ai"
+        badge = ('<span class="src ai">AI</span>' if f.source == "ai"
                  else '<span class="src rule">rule</span>')
         rows.append(
             f'<tr class="sev-{e(f.severity)}">'

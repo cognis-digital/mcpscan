@@ -84,8 +84,13 @@ def _emit(report: Report, fmt: str, out_path: Optional[str]) -> None:
     else:
         text = _render_table(report)
     if out_path:
-        with open(out_path, "w", encoding="utf-8") as fh:
-            fh.write(text + "\n")
+        try:
+            with open(out_path, "w", encoding="utf-8") as fh:
+                fh.write(text + "\n")
+        except OSError as exc:
+            print(f"error: cannot write report to {out_path!r}: {exc}",
+                  file=sys.stderr)
+            raise SystemExit(2) from exc
         print(f"wrote {fmt} report to {out_path}", file=sys.stderr)
     else:
         _print_unicode_safe(text)
@@ -175,6 +180,17 @@ def _exit_code(report: Report, fail_on: Optional[str]) -> int:
     return 0
 
 
+def _validate_timeout(timeout: float, cmd: str) -> Optional[int]:
+    """Return None if timeout is valid, else print an error and return 2."""
+    if timeout <= 0:
+        print(
+            f"error: --timeout must be a positive number, got {timeout!r}",
+            file=sys.stderr,
+        )
+        return 2
+    return None
+
+
 def _run_scan(args: argparse.Namespace) -> int:
     try:
         report = scan_path(args.path, use_ai=getattr(args, "ai", False),
@@ -190,6 +206,9 @@ def _run_scan(args: argparse.Namespace) -> int:
 
 
 def _run_scan_url(args: argparse.Namespace) -> int:
+    err = _validate_timeout(args.timeout, "scan-url")
+    if err is not None:
+        return err
     try:
         report = scan_url(args.url, timeout=args.timeout,
                           use_ai=getattr(args, "ai", False),
@@ -204,6 +223,9 @@ def _run_scan_url(args: argparse.Namespace) -> int:
 
 
 def _run_probe(args: argparse.Namespace) -> int:
+    err = _validate_timeout(args.timeout, "probe")
+    if err is not None:
+        return err
     try:
         report = probe_endpoint(
             args.url,
