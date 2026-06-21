@@ -34,7 +34,7 @@ jobs:
       - name: mcpscan — MCP / AI-agent security scan
         uses: cognis-digital/mcpscan@main
         with:
-          path: .
+          path: demos/03-config/clean_server.py
           fail-on: high
           comment-pr: "true"
           # ai: "false"   # opt-in; set COGNIS_AI_* env to enable the AI layer
