@@ -44,7 +44,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 TOOL_NAME = "mcpscan"
-TOOL_VERSION = "0.5.0"
+TOOL_VERSION = "0.6.0"
 
 # Severity ordering, highest first. Used for sorting + --fail-on policy.
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
@@ -1582,30 +1582,28 @@ def _jsonrpc(url: str, method: str, headers: Optional[Dict[str, str]] = None,
         return status, body
 
 
-def probe_endpoint(url: str, token: Optional[str] = None,
-                   timeout: float = 6.0) -> Report:
+def _assess_endpoint_response(url: str, anon_status: int,
+                              body: Any, *, infer_auth: bool = True,
+                              infer_tls: bool = True) -> Report:
+    """Build a Report from a (status, body) tools/list response.
+
+    Pure / offline: shared by the live :func:`probe_endpoint` (ACTIVE) and the
+    :func:`passive_capture` analyzer (no network). All threat assessment of an
+    MCP endpoint's advertised tools lives here.
+
+    ``infer_auth`` / ``infer_tls`` are disabled for passive captures, where the
+    HTTP status / transport cannot be trusted from a static dump — only the
+    advertised-tool risks are assessed in that mode.
+    """
     report = Report(source=url, target_kind="endpoint")
-
-    if not re.match(r"^https?://", url, re.I):
-        raise ScanError("endpoint must be an http(s):// URL")
-
-    try:
-        anon_status, body = _jsonrpc(url, "tools/list", headers=None,
-                                     timeout=timeout)
-        status = anon_status
-        if anon_status in (401, 403) and token:
-            status, body = _jsonrpc(
-                url, "tools/list",
-                headers={"Authorization": f"Bearer {token}"}, timeout=timeout)
-    except (urllib.error.URLError, socket.timeout, OSError) as exc:
-        raise ScanError(f"could not reach endpoint: {exc}") from exc
-
     tools = _extract_tools(body)
     auth_required = anon_status in (401, 403)
-    exposed_no_auth = (not auth_required and anon_status < 400
-                       and tools is not None)
+    # In passive mode we never reached the endpoint, so "exposed without auth"
+    # is not a claim we can make. Tool capability assessment still applies.
+    exposed_no_auth = (infer_auth and not auth_required
+                       and anon_status < 400 and tools is not None)
 
-    if exposed_no_auth:
+    if infer_auth and exposed_no_auth:
         report.findings.append(Finding(
             "live.no_auth", "critical",
             "Endpoint answered tools/list with NO authentication "
@@ -1615,21 +1613,21 @@ def probe_endpoint(url: str, token: Optional[str] = None,
             "Require a bearer token / OAuth and reject unauthenticated "
             "tools/list and tools/call requests.",
         ))
-    elif auth_required:
+    elif infer_auth and auth_required:
         report.findings.append(Finding(
             "live.auth_enforced", "info",
             f"Endpoint requires authentication (HTTP {anon_status}) for "
             "tools/list — good.",
             url, "",
         ))
-    elif anon_status >= 500:
+    elif infer_auth and anon_status >= 500:
         report.findings.append(Finding(
             "live.server_error", "low",
             f"Endpoint returned HTTP {anon_status} on tools/list.",
             url, "Check server logs; mcpscan could not enumerate tools.",
         ))
 
-    if url.lower().startswith("http://"):
+    if infer_tls and url.lower().startswith("http://"):
         report.findings.append(Finding(
             "live.no_tls", "high",
             "MCP endpoint served over plain HTTP; tokens and tool traffic "
@@ -1648,6 +1646,93 @@ def probe_endpoint(url: str, token: Optional[str] = None,
             report.findings.extend(
                 _assess_live_tool(t, url, exposed=exposed_no_auth))
 
+    _finalize(report)
+    return report
+
+
+def probe_endpoint(url: str, token: Optional[str] = None,
+                   timeout: float = 6.0, *,
+                   scope: "Optional[object]" = None,
+                   rate_limiter: "Optional[object]" = None) -> Report:
+    """ACTIVE: send live JSON-RPC ``tools/list`` to an MCP endpoint.
+
+    This is the only function in the engine that initiates outbound traffic to
+    an arbitrary target. It is GATED: a :class:`mcpscan.authz.Scope` must be
+    supplied and must authorize + contain ``url`` (fail-closed), and outbound
+    requests are paced through a rate limiter. The CLI builds the scope from
+    ``--authorized`` + ``--target-allowlist`` and refuses otherwise.
+    """
+    if not re.match(r"^https?://", url, re.I):
+        raise ScanError("endpoint must be an http(s):// URL")
+
+    # --- authorization gate (fail-closed) -------------------------------
+    from .authz import AuthorizationError, RateLimiter, Scope
+    if scope is None:
+        raise AuthorizationError(
+            "active scanning is OFF by default — probe requires an authorized "
+            "scope (use the CLI's --authorized + --target-allowlist).")
+    scope.check(url)  # raises AuthorizationError if unauthorized/out-of-scope
+    if rate_limiter is None:
+        rate_limiter = RateLimiter(getattr(scope, "rate_limit", 1.0))
+
+    try:
+        rate_limiter.acquire()
+        anon_status, body = _jsonrpc(url, "tools/list", headers=None,
+                                     timeout=timeout)
+        if anon_status in (401, 403) and token:
+            rate_limiter.acquire()
+            _, body = _jsonrpc(
+                url, "tools/list",
+                headers={"Authorization": f"Bearer {token}"}, timeout=timeout)
+    except (urllib.error.URLError, socket.timeout, OSError) as exc:
+        raise ScanError(f"could not reach endpoint: {exc}") from exc
+
+    return _assess_endpoint_response(url, anon_status, body)
+
+
+def passive_capture(target: str, *, source_label: Optional[str] = None) -> Report:
+    """PASSIVE (default, OFFLINE): analyse a previously-captured MCP
+    ``tools/list`` response without any network traffic.
+
+    ``target`` is a path to a JSON file (or ``-`` for stdin already read into a
+    string by the caller) containing either a raw JSON-RPC response, a bare
+    ``{"tools": [...]}`` object, or a list of tool objects. The same tool
+    threat assessment used by the live probe is applied — so an operator can
+    triage a capture they already hold with zero outbound traffic.
+    """
+    raw: str
+    label = source_label or str(target)
+    p = Path(target)
+    if p.exists():
+        try:
+            raw = p.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            raise ScanError(f"could not read capture: {exc}") from exc
+    else:
+        # treat target itself as inline JSON text
+        raw = target
+        label = source_label or "<capture>"
+    try:
+        body = json.loads(raw)
+    except (json.JSONDecodeError, ValueError) as exc:
+        raise ScanError(f"capture is not valid JSON: {exc}") from exc
+
+    # normalize a bare list of tools into a result envelope
+    if isinstance(body, list):
+        body = {"result": {"tools": body}}
+
+    status = 200
+    report = _assess_endpoint_response(label, status, body,
+                                       infer_auth=False, infer_tls=False)
+    # passive marker: there was no live auth handshake, so add a note finding
+    report.findings.append(Finding(
+        "passive.capture_analyzed",
+        "info",
+        "Analyzed a captured tools/list response OFFLINE (no network "
+        "traffic). Auth posture cannot be inferred from a static capture; "
+        "use the gated `probe` command to test live authentication.",
+        label, "",
+    ))
     _finalize(report)
     return report
 

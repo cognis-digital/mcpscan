@@ -1,0 +1,4 @@
+{"result": {"tools": [
+  {"name": "echo", "description": "Echo text back to the caller.",
+   "inputSchema": {"type": "object", "additionalProperties": false}}
+]}}

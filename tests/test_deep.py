@@ -17,6 +17,19 @@ from mcpscan.core import (
     scan_js_source,
     to_sarif,
 )
+from mcpscan.authz import RateLimiter, Scope
+
+
+def _localhost_scope(rate=1000.0):
+    """An authorized scope covering loopback, for probing the local fixture
+    server only. Used so probe tests never need a real external host."""
+    return Scope.from_spec(
+        ["127.0.0.1", "::1", "localhost"], authorized=True, rate_limit=rate)
+
+
+# A non-blocking rate limiter for tests (virtual clock, no real sleeping).
+def _fast_limiter():
+    return RateLimiter(1000.0, clock=lambda: 0.0, sleep=lambda _s: None)
 
 
 class TestJsSweep(unittest.TestCase):
@@ -99,7 +112,9 @@ class _ServerCtx:
 class TestLiveProbe(unittest.TestCase):
     def test_no_auth_endpoint_is_critical(self):
         with _ServerCtx(require_auth=False) as url:
-            report = probe_endpoint(url, timeout=5)
+            report = probe_endpoint(url, timeout=5,
+                                    scope=_localhost_scope(),
+                                    rate_limiter=_fast_limiter())
         rules = {f.rule for f in report.findings}
         self.assertIn("live.no_auth", rules)
         self.assertIn("live.no_tls", rules)          # plain http
@@ -112,7 +127,9 @@ class TestLiveProbe(unittest.TestCase):
 
     def test_authed_endpoint_no_no_auth_finding(self):
         with _ServerCtx(require_auth=True) as url:
-            report = probe_endpoint(url, token="secret", timeout=5)
+            report = probe_endpoint(url, token="secret", timeout=5,
+                                    scope=_localhost_scope(),
+                                    rate_limiter=_fast_limiter())
         rules = {f.rule for f in report.findings}
         self.assertNotIn("live.no_auth", rules)
         self.assertIn("live.auth_enforced", rules)
@@ -121,6 +138,27 @@ class TestLiveProbe(unittest.TestCase):
         from mcpscan.core import ScanError
         with self.assertRaises(ScanError):
             probe_endpoint("ftp://nope")
+
+    def test_probe_refuses_out_of_scope_localhost(self):
+        # Scope only allows 10.0.0.0/8; probing loopback must be refused
+        # BEFORE the fixture server is contacted.
+        from mcpscan.authz import AuthorizationError
+        with _ServerCtx(require_auth=False) as url:
+            scope = Scope.from_spec(["10.0.0.0/8"], authorized=True,
+                                    rate_limit=1000.0)
+            with self.assertRaises(AuthorizationError):
+                probe_endpoint(url, scope=scope, rate_limiter=_fast_limiter())
+
+    def test_probe_rate_limiter_is_invoked(self):
+        calls = []
+        with _ServerCtx(require_auth=False) as url:
+            class _Counting(RateLimiter):
+                def acquire(self_inner):
+                    calls.append(1)
+                    return 0.0
+            rl = _Counting(1000.0, clock=lambda: 0.0, sleep=lambda _s: None)
+            probe_endpoint(url, scope=_localhost_scope(), rate_limiter=rl)
+        self.assertGreaterEqual(len(calls), 1)
 
 
 class TestScoringAndExport(unittest.TestCase):

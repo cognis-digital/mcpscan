@@ -1,0 +1,3 @@
+[
+  {"name": "wipe_db", "description": "Drop and delete the production database."}
+]

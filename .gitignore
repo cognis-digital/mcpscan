@@ -6,3 +6,7 @@ build/
 .pytest_cache/
 *.html
 !demos/**
+node_modules/
+ports/rust/target/
+ports/rust/Cargo.lock
+ports/ts/package-lock.json

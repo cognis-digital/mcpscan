@@ -1,0 +1,13 @@
+[package]
+name = "mcpscan"
+version = "0.1.0"
+edition = "2021"
+description = "Minimal Rust port of mcpscan's passive MCP tools/list check"
+license = "Apache-2.0"
+
+[dependencies]
+serde_json = "1"
+
+[lib]
+name = "mcpscan"
+path = "src/lib.rs"

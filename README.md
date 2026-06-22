@@ -39,6 +39,54 @@ current 2026 agentic-security standard.
 
 *AI Security & Governance — securing LLMs, agents, and the MCP supply chain.*
 
+## Passive (default) vs Active (authorized-use only)
+
+mcpscan is a **defensive, authorized-use-only** scanner with two operating
+modes:
+
+* **PASSIVE — the default, fully OFFLINE.** Every static mode (`scan`,
+  `scan-url`'s fetched file, `deps`, and the new `passive` capture analyzer)
+  works on input you already hold and sends **no traffic to a target**. This
+  is byte-for-byte deterministic and safe to run anywhere, including
+  air-gapped CI.
+
+  ```bash
+  mcpscan scan ./my-mcp-server                # analyze source offline
+  mcpscan deps ./my-mcp-server                # analyze the dependency manifests
+  mcpscan passive captured_tools_list.json    # triage a captured tools/list dump
+  ```
+
+* **ACTIVE — `mcpscan probe`, OFF BY DEFAULT, GATED.** The only mode that
+  sends live network traffic to a target. It refuses to run unless you
+  **explicitly authorize it and declare a scope**:
+
+  > ⚠️ **AUTHORIZED USE ONLY.** Only probe systems you own or are explicitly
+  > permitted to test. Unauthorized scanning may be illegal. mcpscan is a
+  > defensive tool — it has no exploit payloads and never attempts to abuse a
+  > finding.
+
+  An active scan requires **all** of:
+  * `--authorized` — an explicit acknowledgement that you have permission;
+  * a **target allowlist / scope** — `--target-allowlist HOST[:PORT]`
+    (repeatable, accepts `host`, `host:port`, IP, or CIDR) or
+    `--target-allowlist-file PATH`. Targets **not in scope are refused**,
+    never probed (fail-closed);
+  * a **rate limit** — `--rate-limit RPS` (default `1.0`) paces outbound
+    requests so a scan can't become a flood.
+
+  Before any traffic, a loud authorized-use banner naming the scope is printed
+  to stderr. A refusal exits with code `3`.
+
+  ```bash
+  # Probe a server you run, scoped to loopback, at 2 req/s:
+  mcpscan probe http://127.0.0.1:8080/mcp \
+      --authorized --target-allowlist 127.0.0.1 --rate-limit 2
+
+  # Scope to a CIDR + port and load the allowlist from a file:
+  mcpscan probe https://mcp.internal:8443/mcp \
+      --authorized --target-allowlist-file scope.txt --token "$TOKEN"
+  ```
+
 ## Usage — step by step
 
 `mcpscan` finds RCE/SSRF/no-auth/tool-poisoning and other vulnerabilities in MCP servers, mapping each finding to the OWASP LLM Top-10, a CWE, and the Microsoft agent-threat taxonomy. It can scan source, a remote URL, or a live endpoint.
@@ -62,14 +110,26 @@ current 2026 agentic-security standard.
    mcpscan scan ./my-mcp-server --format sarif --out mcpscan.sarif
    ```
 
-4. **Scan remote / live targets** — pull a GitHub URL, or probe a running endpoint (optionally with a bearer token):
+4. **Scan a remote file (passive)** — pull a public GitHub / raw URL and scan its source offline:
 
    ```bash
-   mcpscan url https://github.com/org/repo/blob/main/server.py --format json
-   mcpscan probe https://mcp.example.com --token "$TOKEN"
+   mcpscan scan-url https://github.com/org/repo/blob/main/server.py --format json
    ```
 
-5. **Audit the dependency supply chain** (ASI04) — known-vuln versions, rug-pull windows, install hooks, typosquats, missing lockfiles. Offline + deterministic by default; `--online` adds a live OSV.dev check:
+5. **Triage a captured `tools/list` (passive, offline)** — no network:
+
+   ```bash
+   mcpscan passive captured_tools_list.json --format json
+   ```
+
+6. **Probe a live endpoint (ACTIVE — authorized-use only).** OFF by default; requires `--authorized` **and** a target scope, and is rate-limited. Out-of-scope targets are refused:
+
+   ```bash
+   mcpscan probe http://127.0.0.1:8080/mcp \
+       --authorized --target-allowlist 127.0.0.1 --rate-limit 2 --token "$TOKEN"
+   ```
+
+7. **Audit the dependency supply chain** (ASI04) — known-vuln versions, rug-pull windows, install hooks, typosquats, missing lockfiles. Offline + deterministic by default; `--online` adds a live OSV.dev check:
 
    ```bash
    mcpscan deps ./my-mcp-server                 # offline, air-gap-safe
@@ -77,7 +137,7 @@ current 2026 agentic-security standard.
    mcpscan deps ./my-mcp-server --format sarif --fail-on high
    ```
 
-6. **Gate it in CI** — fail the build on findings at/above a severity; add the deterministic-by-default opt-in `--ai` review layer when you want LLM triage:
+8. **Gate it in CI** — fail the build on findings at/above a severity; add the deterministic-by-default opt-in `--ai` review layer when you want LLM triage:
 
    ```bash
    mcpscan scan ./my-mcp-server --format sarif --out mcpscan.sarif --fail-on high
@@ -129,12 +189,20 @@ current 2026 agentic-security standard.
   cleartext `http://` (`config.no_tls_remote`, `CWE-319`, `LLM02`); loopback
   and `https://` are clean.
 
-**Live** (probe a running HTTP MCP endpoint over `urllib`):
+**Live** — *ACTIVE mode, `mcpscan probe`, authorization-gated (see above)* —
+probe a running HTTP MCP endpoint over `urllib`:
 
 - **Missing authentication** (`live.no_auth`), **cleartext transport**
   (`live.no_tls`), and **overly-broad capabilities** — destructive tools
   reachable without auth, tools with no input schema, and
   `additionalProperties: true` schemas.
+
+**Passive capture** — *`mcpscan passive`, OFFLINE* — feed it a previously
+captured `tools/list` JSON dump (raw JSON-RPC response, a bare
+`{"tools":[...]}`, or a top-level array) and it applies the same advertised-tool
+threat assessment (**dangerous capability**, **tool poisoning**, **open /
+missing input schema**) with **zero network traffic**. Auth and transport
+posture are *not* inferred in passive mode — those require the gated live probe.
 
 **Remote** — `mcpscan scan-url <github-or-raw-url>` fetches a public MCP server
 file over `urllib` (auto-normalizing `github.com/.../blob/...` to raw) and scans
@@ -163,8 +231,10 @@ mcpscan scan path/to/server.py --format badge                 # shields.io endpo
 mcpscan scan path/to/server/ --fail-on high                   # CI gate (exits 1)
 mcpscan scan-url https://github.com/owner/repo/blob/main/server.py   # scan a remote file
 mcpscan scan path/to/server/ --ai                             # opt-in AI review layer
-mcpscan probe http://127.0.0.1:8080/mcp --fail-on high        # live no-auth probe
-mcpscan probe https://mcp.example.com/mcp --token "$TOKEN"    # authenticated probe
+mcpscan passive captured_tools_list.json                      # OFFLINE capture triage
+# ACTIVE (authorized-use only) — OFF unless --authorized + a scope is given:
+mcpscan probe http://127.0.0.1:8080/mcp --authorized --target-allowlist 127.0.0.1 --rate-limit 2
+mcpscan probe https://mcp.internal:8443/mcp --authorized --target-allowlist-file scope.txt --token "$TOKEN"
 ```
 
 ## Output formats
@@ -256,6 +326,25 @@ scoped capability:
 ```bash
 python -m mcpscan.mcp_server     # requires the `mcp` extra + cognis_core
 ```
+
+## Language ports
+
+The Python package is the reference implementation. The tool's **core passive
+check** (offline analysis of a captured `tools/list` — dangerous capability,
+tool poisoning, open/missing input schema) is also ported, each with its own
+tests, under [`ports/`](ports/):
+
+| Port | Path | Test |
+|------|------|------|
+| **Go**         | [`ports/go`](ports/go)     | `go test ./...` |
+| **Rust**       | [`ports/rust`](ports/rust) | `cargo test` |
+| **TypeScript** | [`ports/ts`](ports/ts)     | `npm install && npm test` |
+
+The ports are passive and offline, so there is nothing to gate — the
+authorization-gated ACTIVE probe lives only in the Python tool. The Go and Rust
+ports are built/tested on GitHub Actions runners
+([`.github/workflows/ports.yml`](.github/workflows/ports.yml)); the TypeScript
+port and the full Python suite are verified locally.
 
 ## How it fits the Cognis Neural Suite
 

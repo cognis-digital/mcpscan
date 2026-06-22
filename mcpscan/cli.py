@@ -13,6 +13,7 @@ from .core import (
     ScanError,
     SEVERITY_ORDER,
     audit_dependencies,
+    passive_capture,
     probe_endpoint,
     scan_path,
     scan_url,
@@ -21,6 +22,7 @@ from .core import (
     to_json,
     to_sarif,
 )
+from .authz import AuthorizationError, RateLimiter, Scope
 
 _SEV_LABEL = {
     "critical": "CRIT",
@@ -171,12 +173,42 @@ def _build_parser() -> argparse.ArgumentParser:
     _common(su)
     _ai(su)
 
-    pr = sub.add_parser("probe",
-                        help="Probe a live HTTP MCP endpoint (tools/list).")
+    pa = sub.add_parser(
+        "passive",
+        help="PASSIVE (default, OFFLINE): analyse a captured MCP tools/list "
+             "JSON dump — no network traffic.")
+    pa.add_argument("capture",
+                    help="Path to a JSON file with a captured tools/list "
+                         "response (or a bare {\"tools\":[...]} / [..] list).")
+    _common(pa)
+
+    pr = sub.add_parser(
+        "probe",
+        help="ACTIVE (authorized-use only): send live tools/list to an MCP "
+             "endpoint. OFF by default — needs --authorized + a scope.")
     pr.add_argument("url", help="http(s):// MCP endpoint URL.")
     pr.add_argument("--token", help="Bearer token to use when probing.")
     pr.add_argument("--timeout", type=float, default=6.0,
                     help="Network timeout in seconds (default: 6).")
+    pr.add_argument(
+        "--authorized", action="store_true",
+        help="REQUIRED for active scanning. Affirms you are permitted to test "
+             "the target. Without it, probe refuses to send any traffic.")
+    pr.add_argument(
+        "--target-allowlist", metavar="HOST[:PORT]", action="append",
+        default=None,
+        help="Scope entry the target MUST match: host, host:port, IP, or "
+             "CIDR. Repeatable / comma-separated. Out-of-scope targets are "
+             "refused.")
+    pr.add_argument(
+        "--target-allowlist-file", metavar="PATH", default=None,
+        help="File of scope entries (one per line; # comments allowed).")
+    pr.add_argument(
+        "--rate-limit", type=float, default=1.0, metavar="RPS",
+        help="Max outbound probe requests per second (default: 1.0).")
+    pr.add_argument(
+        "--resolve", action="store_true",
+        help="Also match the target's DNS-resolved IP(s) against the scope.")
     _common(pr)
 
     dp = sub.add_parser(
@@ -254,13 +286,43 @@ def _run_scan_url(args: argparse.Namespace) -> int:
     return _exit_code(report, args.fail_on)
 
 
+def _run_passive(args: argparse.Namespace) -> int:
+    try:
+        report = passive_capture(args.capture)
+    except ScanError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    _emit(report, args.format, args.out)
+    return _exit_code(report, args.fail_on)
+
+
 def _run_probe(args: argparse.Namespace) -> int:
+    from .authz import emit_banner
+    try:
+        scope = Scope.from_spec(
+            allow=getattr(args, "target_allowlist", None),
+            allow_file=getattr(args, "target_allowlist_file", None),
+            authorized=getattr(args, "authorized", False),
+            rate_limit=getattr(args, "rate_limit", 1.0),
+            resolve=getattr(args, "resolve", False),
+        )
+        # Fail-closed BEFORE any traffic: authorize + scope-check the target.
+        scope.check(args.url)
+    except AuthorizationError as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 3
+    emit_banner(scope)
     try:
         report = probe_endpoint(
             args.url,
             token=args.token,
             timeout=args.timeout,
+            scope=scope,
+            rate_limiter=RateLimiter(scope.rate_limit),
         )
+    except AuthorizationError as exc:
+        print(f"refused: {exc}", file=sys.stderr)
+        return 3
     except ScanError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -288,6 +350,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _run_scan(args)
     if args.command == "scan-url":
         return _run_scan_url(args)
+    if args.command == "passive":
+        return _run_passive(args)
     if args.command == "probe":
         return _run_probe(args)
     if args.command == "deps":
