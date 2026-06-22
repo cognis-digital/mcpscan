@@ -7,6 +7,7 @@ import sys
 from typing import List, Optional
 
 from . import TOOL_NAME, TOOL_VERSION
+from .agentic import asi_label, asi_for
 from .core import (
     Report,
     ScanError,
@@ -53,6 +54,9 @@ def _render_table(report: Report) -> str:
                 tags.append(f.cwe)
             if f.owasp_llm:
                 tags.append(f"OWASP {f.owasp_llm}")
+            _asi = asi_label(f)
+            if _asi:
+                tags.append(_asi)
             if f.ms_taxonomy:
                 tags.append(f"MS:{f.ms_taxonomy}")
             tag_str = ("  {" + ", ".join(tags) + "}") if tags else ""
@@ -74,7 +78,13 @@ def _render_table(report: Report) -> str:
 
 def _emit(report: Report, fmt: str, out_path: Optional[str]) -> None:
     if fmt == "json":
-        text = to_json(report)
+        import json as _json
+        data = _json.loads(to_json(report))
+        for fd in data.get("findings", []):
+            c = asi_for(cwe=fd.get("cwe", ""), owasp_llm=fd.get("owasp_llm", ""),
+                        ms_taxonomy=fd.get("ms_taxonomy", ""))
+            fd["owasp_asi"] = c.id if c else ""
+        text = _json.dumps(data, indent=2)
     elif fmt == "sarif":
         text = to_sarif(report)
     elif fmt == "html":
@@ -166,12 +176,32 @@ def _build_parser() -> argparse.ArgumentParser:
                     help="Network timeout in seconds (default: 6).")
     _common(pr)
 
+    tx = sub.add_parser("taxonomy",
+                        help="Show the OWASP Top 10 for Agentic Applications (2026) mapping.")
+    tx.add_argument("--format", choices=("table", "json"), default="table")
+
     return p
 
 
 def _exit_code(report: Report, fail_on: Optional[str]) -> int:
     if fail_on and report.fail(fail_on):
         return 1
+    return 0
+
+
+def _run_taxonomy(args: argparse.Namespace) -> int:
+    from .agentic import CATALOG
+    import json as _json
+    if args.format == "json":
+        print(_json.dumps([{"id": c.id, "title": c.title, "summary": c.summary}
+                           for c in CATALOG], indent=2))
+        return 0
+    print(f"{TOOL_NAME} {TOOL_VERSION} — OWASP Top 10 for Agentic Applications (2026)")
+    print("=" * 72)
+    for c in CATALOG:
+        print(f"  {c.id}  {c.title}")
+        print(f"        {c.summary}")
+    print("\nFindings are tagged with their ASI class (see the [ASI0x] tag in scan output).")
     return 0
 
 
@@ -226,6 +256,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _run_scan_url(args)
     if args.command == "probe":
         return _run_probe(args)
+    if args.command == "taxonomy":
+        return _run_taxonomy(args)
     parser.print_help(sys.stderr)
     return 2
 

@@ -9,10 +9,21 @@
 [![Suite](https://img.shields.io/badge/Cognis-Neural%20Suite-6b46c1.svg)](https://github.com/cognis-digital)
 
 **A vulnerability scanner for Model Context Protocol (MCP) servers and the
-agents that drive them.** It maps findings to the **OWASP LLM Top-10**, a
-**CWE** id, and the **Microsoft agent-threat taxonomy** — statically from
-source (with real AST taint dataflow), by probing a live endpoint, by fetching
-a remote GitHub URL, and via an **opt-in AI review layer**.
+agents that drive them.** It maps every finding to four frameworks — the
+**OWASP Top 10 for Agentic Applications (2026, ASI01–ASI10)**, the **OWASP LLM
+Top-10**, a **CWE** id, and the **Microsoft agent-threat taxonomy** — statically
+from source (with real AST taint dataflow), by probing a live endpoint, by
+fetching a remote GitHub URL, and via an **opt-in AI review layer**.
+
+```bash
+mcpscan taxonomy                 # the OWASP Agentic Top-10 (2026) classes
+mcpscan scan server.py           # findings tagged [ASI0x] + OWASP-LLM + CWE + MS
+mcpscan scan server.py --format sarif   # ASI/OWASP/CWE travel into code-scanning
+```
+
+Every finding now carries an `owasp_asi` class (e.g. `ASI02 Tool Misuse`,
+`ASI05 Unsafe Code Execution`, `ASI06 Memory Poisoning`) so reports speak the
+current 2026 agentic-security standard.
 
 *AI Security & Governance — securing LLMs, agents, and the MCP supply chain.*
 

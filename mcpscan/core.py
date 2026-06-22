@@ -44,7 +44,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 TOOL_NAME = "mcpscan"
-TOOL_VERSION = "0.3.0"
+TOOL_VERSION = "0.4.0"
 
 # Severity ordering, highest first. Used for sorting + --fail-on policy.
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
