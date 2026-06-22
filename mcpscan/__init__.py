@@ -7,11 +7,17 @@ try:
     from mcpscan.core import TOOL_NAME, TOOL_VERSION
 except Exception:  # pragma: no cover
     TOOL_NAME = "mcpscan"
-    TOOL_VERSION = "0.4.0"
+    TOOL_VERSION = "0.5.0"
 __version__ = TOOL_VERSION
 
 try:  # OWASP Top 10 for Agentic Applications (2026) taxonomy + mapping
     from mcpscan import agentic  # noqa: F401
     from mcpscan.agentic import CATALOG as ASI_CATALOG, asi_for, asi_label  # noqa: F401
+except Exception:  # pragma: no cover
+    pass
+
+try:  # v0.5 supply-chain / dependency audit (ASI04 Agent Supply Chain)
+    from mcpscan import supplychain  # noqa: F401
+    from mcpscan.core import audit_dependencies  # noqa: F401
 except Exception:  # pragma: no cover
     pass

@@ -1,0 +1,27 @@
+{
+  "_comment": "Allowlist of widely-used package names per ecosystem. mcpscan flags a declared dependency as a possible typosquat / dependency-confusion target when its name is a near-miss (edit distance 1) of one of these but is NOT itself on the list. Names are lowercased. This is a heuristic, not an oracle; it surfaces candidates for human review, never auto-blocks.",
+  "_source": "Public download-rank lists (PyPI top packages, npm most-depended-upon). Names only.",
+  "PyPI": [
+    "requests", "urllib3", "boto3", "botocore", "setuptools", "certifi",
+    "idna", "charset-normalizer", "six", "python-dateutil", "pyyaml",
+    "numpy", "pandas", "click", "jinja2", "markupsafe", "cryptography",
+    "pydantic", "fastapi", "uvicorn", "starlette", "anyio", "httpx",
+    "httpcore", "sniffio", "typing-extensions", "packaging", "attrs",
+    "flask", "werkzeug", "sqlalchemy", "aiohttp", "redis", "celery",
+    "pytest", "tox", "wheel", "pip", "openai", "anthropic", "tiktoken",
+    "langchain", "transformers", "torch", "scikit-learn", "scipy",
+    "beautifulsoup4", "lxml", "pillow", "matplotlib", "tqdm", "rich",
+    "colorama", "websockets", "grpcio", "protobuf", "google-auth", "mcp"
+  ],
+  "npm": [
+    "lodash", "react", "react-dom", "express", "axios", "chalk", "commander",
+    "debug", "ws", "semver", "minimist", "uuid", "moment", "dayjs",
+    "cross-spawn", "micromatch", "glob", "rimraf", "fs-extra", "dotenv",
+    "body-parser", "cors", "jsonwebtoken", "bcrypt", "mongoose", "pg",
+    "mysql2", "redis", "winston", "pino", "node-fetch", "undici",
+    "typescript", "eslint", "prettier", "jest", "vitest", "webpack",
+    "vite", "rollup", "esbuild", "next", "vue", "svelte", "zod",
+    "yargs", "inquirer", "ora", "kleur", "picocolors", "tslib",
+    "@modelcontextprotocol/sdk", "openai", "@anthropic-ai/sdk"
+  ]
+}

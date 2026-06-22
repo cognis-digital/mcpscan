@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cognis-mcpscan"
-version = "0.3.1"
+version = "0.5.0"
 description = "Scan MCP servers for RCE/SSRF/no-auth/tool-poisoning vulnerabilities"
 authors = [{name = "Cognis Digital", email = "suite@cognis.digital"}]
 license = {text = "LicenseRef-COCL-1.0"}
@@ -35,6 +35,9 @@ mcpscan = "mcpscan.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["mcpscan"]
+# Ship the offline supply-chain advisory DB + popular-package allowlist so
+# `mcpscan deps` works air-gapped straight from a pip install.
+artifacts = ["mcpscan/data/*.json"]
 
 [tool.hatch.metadata]
 allow-direct-references = true

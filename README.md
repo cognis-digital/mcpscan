@@ -19,7 +19,19 @@ fetching a remote GitHub URL, and via an **opt-in AI review layer**.
 mcpscan taxonomy                 # the OWASP Agentic Top-10 (2026) classes
 mcpscan scan server.py           # findings tagged [ASI0x] + OWASP-LLM + CWE + MS
 mcpscan scan server.py --format sarif   # ASI/OWASP/CWE travel into code-scanning
+mcpscan deps ./server            # NEW (0.5): ASI04 supply-chain / dependency audit
 ```
+
+**New in 0.5 — `mcpscan deps` (ASI04 Agent Supply Chain).** A hardened MCP
+server is still only as safe as the packages its tools import. `mcpscan deps`
+audits `requirements.txt` / `pyproject.toml` / `setup.py` / `package.json` for
+**known-vulnerable pinned versions** (matched against a shipped, offline
+CVE/GHSA advisory DB — real advisories only), **unpinned rug-pull windows**,
+**install-time hooks** (`postinstall` scripts, `setup.py` top-level exec),
+**typosquat / dependency-confusion** candidates, **non-registry sources**, and
+**missing lockfiles**. Offline + deterministic by default; opt-in `--online`
+adds a live OSV.dev check, so it runs on air-gapped/edge gear unchanged. See
+[`docs/SUPPLY_CHAIN.md`](docs/SUPPLY_CHAIN.md).
 
 Every finding now carries an `owasp_asi` class (e.g. `ASI02 Tool Misuse`,
 `ASI05 Unsafe Code Execution`, `ASI06 Memory Poisoning`) so reports speak the
@@ -57,7 +69,15 @@ current 2026 agentic-security standard.
    mcpscan probe https://mcp.example.com --token "$TOKEN"
    ```
 
-5. **Gate it in CI** — fail the build on findings at/above a severity; add the deterministic-by-default opt-in `--ai` review layer when you want LLM triage:
+5. **Audit the dependency supply chain** (ASI04) — known-vuln versions, rug-pull windows, install hooks, typosquats, missing lockfiles. Offline + deterministic by default; `--online` adds a live OSV.dev check:
+
+   ```bash
+   mcpscan deps ./my-mcp-server                 # offline, air-gap-safe
+   mcpscan deps ./my-mcp-server --online         # also check OSV.dev live
+   mcpscan deps ./my-mcp-server --format sarif --fail-on high
+   ```
+
+6. **Gate it in CI** — fail the build on findings at/above a severity; add the deterministic-by-default opt-in `--ai` review layer when you want LLM triage:
 
    ```bash
    mcpscan scan ./my-mcp-server --format sarif --out mcpscan.sarif --fail-on high

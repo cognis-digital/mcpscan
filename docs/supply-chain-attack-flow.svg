@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 470" font-family="-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif" role="img" aria-label="MCP agent supply-chain attack flow (ASI04) and where mcpscan deps intercepts it">
+  <title>MCP Agent Supply-Chain Attack Flow (ASI04)</title>
+  <desc>An LLM agent calls an MCP server whose tool depends on a third-party package. A poisoned, unpinned, or known-vulnerable dependency turns into code execution inside the tool the model trusts. mcpscan deps inspects the manifests and lockfiles between the registry and the running tool.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#475569"/>
+    </marker>
+    <marker id="arrowRed" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#b91c1c"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="900" height="470" fill="#f8fafc"/>
+  <text x="24" y="36" font-size="20" font-weight="700" fill="#0f172a">MCP Agent Supply-Chain Attack Flow — OWASP Agentic ASI04</text>
+  <text x="24" y="58" font-size="13" fill="#475569">Where a poisoned, unpinned, or known-vulnerable dependency becomes code execution inside a trusted tool — and where <tspan font-weight="700">mcpscan deps</tspan> intercepts it.</text>
+
+  <!-- Row 1: trust chain -->
+  <g>
+    <rect x="24" y="92" width="150" height="64" rx="10" fill="#e0e7ff" stroke="#6366f1"/>
+    <text x="99" y="120" font-size="13" font-weight="700" fill="#1e1b4b" text-anchor="middle">LLM Agent</text>
+    <text x="99" y="140" font-size="11" fill="#3730a3" text-anchor="middle">plans &amp; calls tools</text>
+
+    <rect x="224" y="92" width="160" height="64" rx="10" fill="#dcfce7" stroke="#16a34a"/>
+    <text x="304" y="120" font-size="13" font-weight="700" fill="#14532d" text-anchor="middle">MCP Server / Tool</text>
+    <text x="304" y="140" font-size="11" fill="#166534" text-anchor="middle">implements a capability</text>
+
+    <rect x="434" y="92" width="170" height="64" rx="10" fill="#fef9c3" stroke="#ca8a04"/>
+    <text x="519" y="116" font-size="13" font-weight="700" fill="#713f12" text-anchor="middle">Dependency manifest</text>
+    <text x="519" y="134" font-size="11" fill="#854d0e" text-anchor="middle">requirements.txt /</text>
+    <text x="519" y="148" font-size="11" fill="#854d0e" text-anchor="middle">package.json / setup.py</text>
+
+    <rect x="654" y="92" width="160" height="64" rx="10" fill="#fee2e2" stroke="#b91c1c"/>
+    <text x="734" y="116" font-size="13" font-weight="700" fill="#7f1d1d" text-anchor="middle">Public registry</text>
+    <text x="734" y="134" font-size="11" fill="#991b1b" text-anchor="middle">PyPI / npm — incl.</text>
+    <text x="734" y="148" font-size="11" fill="#991b1b" text-anchor="middle">attacker-controlled release</text>
+
+    <line x1="174" y1="124" x2="222" y2="124" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="384" y1="124" x2="432" y2="124" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="604" y1="124" x2="652" y2="124" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  </g>
+
+  <!-- Attack vectors -->
+  <text x="24" y="200" font-size="14" font-weight="700" fill="#0f172a">Six ways the chain breaks (each a finding rule)</text>
+  <g font-size="11" fill="#7f1d1d">
+    <rect x="24" y="214" width="266" height="50" rx="8" fill="#fff1f2" stroke="#fb7185"/>
+    <text x="36" y="234" font-weight="700">known_vuln</text>
+    <text x="36" y="252">pinned version inside a published CVE/GHSA range</text>
+
+    <rect x="306" y="214" width="266" height="50" rx="8" fill="#fff1f2" stroke="#fb7185"/>
+    <text x="318" y="234" font-weight="700">unpinned (rug-pull window)</text>
+    <text x="318" y="252">^ / ~ / range auto-pulls a future malicious release</text>
+
+    <rect x="588" y="214" width="288" height="50" rx="8" fill="#fff1f2" stroke="#fb7185"/>
+    <text x="600" y="234" font-weight="700">install_hook</text>
+    <text x="600" y="252">postinstall script / setup.py top-level exec (ACE)</text>
+
+    <rect x="24" y="274" width="266" height="50" rx="8" fill="#fff1f2" stroke="#fb7185"/>
+    <text x="36" y="294" font-weight="700">typosquat / dependency-confusion</text>
+    <text x="36" y="312">name one edit from a popular package</text>
+
+    <rect x="306" y="274" width="266" height="50" rx="8" fill="#fff1f2" stroke="#fb7185"/>
+    <text x="318" y="294" font-weight="700">nonregistry_source</text>
+    <text x="318" y="312">git+ / url / file: bypasses registry integrity</text>
+
+    <rect x="588" y="274" width="288" height="50" rx="8" fill="#fff1f2" stroke="#fb7185"/>
+    <text x="600" y="294" font-weight="700">no_lockfile</text>
+    <text x="600" y="312">deps without a committed, reviewable lock</text>
+  </g>
+
+  <!-- Interception band -->
+  <rect x="24" y="350" width="852" height="92" rx="12" fill="#ecfeff" stroke="#0891b2" stroke-width="2"/>
+  <text x="44" y="378" font-size="15" font-weight="700" fill="#155e75">mcpscan deps  —  inspects manifests + lockfiles BEFORE the agent ever runs the tool</text>
+  <text x="44" y="402" font-size="12" fill="#0e7490">Offline by default against a shipped CVE/GHSA advisory DB · deterministic · maps every finding to ASI04 + CWE-1357/1395/829 + OWASP-LLM03.</text>
+  <text x="44" y="424" font-size="12" fill="#0e7490">Opt-in <tspan font-weight="700">--online</tspan> adds a live OSV.dev check; air-gapped boxes stay fully functional on the bundled DB.</text>
+
+  <line x1="519" y1="156" x2="450" y2="348" stroke="#b91c1c" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrowRed)"/>
+
+  <text x="24" y="462" font-size="10" fill="#94a3b8">Diagram generated by Cognis Digital for mcpscan · CC0 · no third-party assets embedded.</text>
+</svg>

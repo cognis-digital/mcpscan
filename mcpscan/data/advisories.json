@@ -1,0 +1,106 @@
+{
+  "_comment": "Offline supply-chain advisory database for mcpscan. Real, documented OSV/GHSA/CVE advisories only. Version ranges use OSV semantics: introduced/fixed. ecosystem is PyPI or npm. This is a curated subset shipped for air-gapped/offline use; mcpscan can also query OSV.dev live (opt-in, --online).",
+  "_source": "https://osv.dev / https://github.com/advisories — public advisories, copied verbatim by id/summary.",
+  "advisories": [
+    {
+      "id": "GHSA-462w-v97r-4m45",
+      "aliases": ["CVE-2019-10906"],
+      "ecosystem": "PyPI",
+      "package": "jinja2",
+      "summary": "Jinja2 sandbox escape via str.format / format string",
+      "cvss": "CVSS:3.0/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:N/A:N",
+      "severity": "high",
+      "ranges": [{"introduced": "0", "fixed": "2.10.1"}]
+    },
+    {
+      "id": "GHSA-h5c8-rqwp-cp95",
+      "aliases": ["CVE-2020-28493"],
+      "ecosystem": "PyPI",
+      "package": "jinja2",
+      "summary": "Jinja2 ReDoS in the urlize filter",
+      "cvss": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "severity": "medium",
+      "ranges": [{"introduced": "0", "fixed": "2.11.3"}]
+    },
+    {
+      "id": "GHSA-cpwx-vrp4-4pq7",
+      "aliases": ["CVE-2025-27516"],
+      "ecosystem": "PyPI",
+      "package": "jinja2",
+      "summary": "Jinja2 sandbox breakout through the attr filter selecting the format method",
+      "cvss": "CVSS:4.0/AV:L/AC:L/AT:P/PR:L/UI:P/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N",
+      "severity": "high",
+      "ranges": [{"introduced": "0", "fixed": "3.1.6"}]
+    },
+    {
+      "id": "GHSA-w596-4wvx-j9j6",
+      "aliases": ["CVE-2024-35195"],
+      "ecosystem": "PyPI",
+      "package": "requests",
+      "summary": "Requests Session verify=False persists across requests after the first",
+      "cvss": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:N/A:N",
+      "severity": "medium",
+      "ranges": [{"introduced": "2.3.0", "fixed": "2.32.0"}]
+    },
+    {
+      "id": "GHSA-9wx4-h78v-vm56",
+      "aliases": ["CVE-2023-32681"],
+      "ecosystem": "PyPI",
+      "package": "requests",
+      "summary": "Requests leaks Proxy-Authorization header to destination server on redirect",
+      "cvss": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:H/I:N/A:N",
+      "severity": "medium",
+      "ranges": [{"introduced": "0", "fixed": "2.31.0"}]
+    },
+    {
+      "id": "GHSA-pq67-6m6q-mj2v",
+      "aliases": ["CVE-2024-3651"],
+      "ecosystem": "PyPI",
+      "package": "idna",
+      "summary": "idna denial of service via crafted argument to idna.encode",
+      "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "severity": "high",
+      "ranges": [{"introduced": "0", "fixed": "3.7"}]
+    },
+    {
+      "id": "GHSA-h4gh-qq45-vh27",
+      "aliases": ["CVE-2024-21538"],
+      "ecosystem": "npm",
+      "package": "cross-spawn",
+      "summary": "cross-spawn ReDoS via crafted argument to the parse function",
+      "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "severity": "high",
+      "ranges": [{"introduced": "7.0.0", "fixed": "7.0.5"}]
+    },
+    {
+      "id": "GHSA-3xgq-45jj-v275",
+      "aliases": ["CVE-2024-4067"],
+      "ecosystem": "npm",
+      "package": "micromatch",
+      "summary": "micromatch ReDoS in braces handling",
+      "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "severity": "medium",
+      "ranges": [{"introduced": "0", "fixed": "4.0.8"}]
+    },
+    {
+      "id": "GHSA-952p-6rrq-rcjv",
+      "aliases": ["CVE-2022-25883"],
+      "ecosystem": "npm",
+      "package": "semver",
+      "summary": "semver ReDoS in the range parser via crafted version range",
+      "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "severity": "high",
+      "ranges": [{"introduced": "7.0.0", "fixed": "7.5.2"}]
+    },
+    {
+      "id": "GHSA-grv7-fg5c-xmjg",
+      "aliases": ["CVE-2024-37890"],
+      "ecosystem": "npm",
+      "package": "ws",
+      "summary": "ws DoS via a request with many HTTP headers",
+      "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "severity": "high",
+      "ranges": [{"introduced": "8.0.0", "fixed": "8.17.1"}]
+    }
+  ]
+}

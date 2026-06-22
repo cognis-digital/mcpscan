@@ -44,7 +44,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 TOOL_NAME = "mcpscan"
-TOOL_VERSION = "0.4.0"
+TOOL_VERSION = "0.5.0"
 
 # Severity ordering, highest first. Used for sorting + --fail-on policy.
 SEVERITY_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
@@ -198,6 +198,34 @@ RULE_META: Dict[str, Dict[str, str]] = {
         "cwe": "", "owasp_llm": "LLM01",
         "ms_taxonomy": "agent-novel-logic-flaw",
         "title": "AI-discovered finding"},
+    # --- v0.5 supply-chain / dependency audit (ASI04 Agent Supply Chain) ---
+    "supplychain.known_vuln": {
+        "cwe": "CWE-1395", "owasp_llm": "LLM03",
+        "ms_taxonomy": "agent-supply-chain",
+        "title": "Dependency with a known published vulnerability"},
+    "supplychain.unpinned": {
+        "cwe": "CWE-1357", "owasp_llm": "LLM03",
+        "ms_taxonomy": "agent-supply-chain",
+        "title": "Unpinned dependency (rug-pull / drift window)"},
+    "supplychain.no_lockfile": {
+        "cwe": "CWE-1357", "owasp_llm": "LLM03",
+        "ms_taxonomy": "agent-supply-chain",
+        "title": "Manifest with no committed lockfile"},
+    "supplychain.install_hook": {
+        "cwe": "CWE-829", "owasp_llm": "LLM03",
+        "ms_taxonomy": "agent-supply-chain",
+        "title": "Install-time hook runs arbitrary code"},
+    "supplychain.typosquat": {
+        "cwe": "CWE-1357", "owasp_llm": "LLM03",
+        "ms_taxonomy": "agent-supply-chain",
+        "title": "Possible dependency-confusion / typosquat"},
+    "supplychain.nonregistry_source": {
+        "cwe": "CWE-829", "owasp_llm": "LLM03",
+        "ms_taxonomy": "agent-supply-chain",
+        "title": "Dependency pulled from a non-registry source (VCS/URL/local)"},
+    "supplychain.clean": {
+        "cwe": "", "owasp_llm": "", "ms_taxonomy": "",
+        "title": "No supply-chain issues found"},
 }
 
 
@@ -1704,6 +1732,216 @@ def scan(target: str, endpoint: Optional[str] = None,
     if live:
         return probe_endpoint(live, token=token)
     return scan_path(target, use_ai=use_ai)
+
+
+# ==========================================================================
+# Supply-chain / dependency audit (ASI04) — see mcpscan.supplychain
+# ==========================================================================
+
+def audit_dependencies(target: str, *, online: bool = False,
+                        advisory_db: Optional[str] = None,
+                        timeout: float = 8.0) -> Report:
+    """Audit the MCP server's dependency manifests for ASI04 supply-chain risk.
+
+    Walks ``target`` for requirements.txt / pyproject.toml / setup.py /
+    package.json, parses each, and emits Findings for known-vulnerable pinned
+    versions, unpinned (rug-pull) specs, missing lockfiles, install-time hooks,
+    non-registry sources, and typosquat / dependency-confusion candidates.
+
+    Offline + deterministic by default. With ``online=True`` each pinned
+    dependency is additionally checked against OSV.dev live; network failures
+    degrade gracefully to the shipped offline advisory DB.
+    """
+    from . import supplychain as sc
+
+    p = Path(target)
+    if not p.exists():
+        raise ScanError(f"no such path: {target}")
+
+    report = Report(source=str(target), target_kind="deps")
+
+    if p.is_file():
+        manifests = [p] if p.name in sc.MANIFEST_NAMES else []
+        present_locks = {q.name for q in p.parent.iterdir()
+                         if q.is_file()} if p.parent.exists() else set()
+        all_names = present_locks
+    else:
+        files = [f for f in p.rglob("*")
+                 if f.is_file() and "node_modules" not in f.parts
+                 and ".git" not in f.parts]
+        manifests = [f for f in files if f.name in sc.MANIFEST_NAMES]
+        all_names = {f.name for f in files}
+
+    if not manifests:
+        report.findings.append(Finding(
+            "supplychain.clean", "info",
+            "No dependency manifests (requirements.txt / pyproject.toml / "
+            "setup.py / package.json) found at the target.",
+            str(target),
+            "Point `mcpscan deps` at the MCP server's project root."))
+        _finalize(report)
+        return report
+
+    advisories = sc.load_advisories(advisory_db)
+    popular = sc.load_popular()
+
+    for mf in sorted(manifests, key=lambda x: str(x)):
+        try:
+            src = mf.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        loc = str(mf)
+        deps: List[Any] = []
+        if mf.name == "package.json":
+            deps, meta = sc.parse_package_json(loc, src)
+            report.files_scanned += 1
+            for hook, cmd in (meta.get("install_hooks") or {}).items():
+                report.findings.append(Finding(
+                    "supplychain.install_hook", "high",
+                    f"package.json defines an install-time '{hook}' script that "
+                    f"runs arbitrary code on `npm install`: {str(cmd)[:120]}",
+                    loc,
+                    "Audit and remove unnecessary lifecycle scripts; install "
+                    "with `npm ci --ignore-scripts` in untrusted/CI contexts."))
+            _check_lockfile(report, loc, sc.JS_LOCKS, all_names, bool(deps))
+        elif mf.name in ("setup.py",):
+            deps, meta = sc.parse_setup_py(loc, src)
+            report.files_scanned += 1
+            if meta.get("risky_exec"):
+                report.findings.append(Finding(
+                    "supplychain.install_hook", "high",
+                    "setup.py executes code (subprocess / network / eval) at "
+                    "module top level — this runs on `pip install` before any "
+                    "review, an arbitrary-code-execution supply-chain surface.",
+                    loc,
+                    "Move logic into functions called by setup(); never run "
+                    "shell/network code at import time. Prefer pyproject.toml "
+                    "declarative metadata."))
+        elif mf.name in ("requirements.txt", "requirements.in"):
+            deps = sc.parse_requirements(loc, src)
+            report.files_scanned += 1
+            _check_lockfile(report, loc, sc.PY_LOCKS, all_names, bool(deps))
+        elif mf.name in ("pyproject.toml", "setup.cfg"):
+            deps = _parse_toml_cfg_deps(loc, src, mf.name, sc)
+            report.files_scanned += 1
+            _check_lockfile(report, loc, sc.PY_LOCKS, all_names, bool(deps))
+        else:
+            continue
+
+        for dep in deps:
+            _emit_dep_findings(report, dep, advisories, popular, online, timeout, sc)
+
+    if not report.findings:
+        report.findings.append(Finding(
+            "supplychain.clean", "info",
+            "All declared dependencies are pinned, lock-backed, free of known "
+            "advisories in the offline DB, and show no install hooks or "
+            "typosquat candidates.",
+            str(target),
+            "Re-run with --online to also check OSV.dev for fresh advisories."))
+
+    _finalize(report)
+    return report
+
+
+def _check_lockfile(report: Report, manifest_loc: str, lock_set: set,
+                    present: set, has_deps: bool) -> None:
+    if has_deps and not (lock_set & present):
+        report.findings.append(Finding(
+            "supplychain.no_lockfile", "low",
+            f"{Path(manifest_loc).name} declares dependencies but no committed "
+            "lockfile was found — installs are not reproducible and a "
+            "transitive rug-pull would go unnoticed.",
+            manifest_loc,
+            "Commit a lockfile (package-lock.json / poetry.lock / uv.lock / "
+            "pip-compile constraints) and install from it."))
+
+
+def _parse_toml_cfg_deps(loc: str, src: str, name: str, sc) -> List[Any]:
+    """Extract dependency specs from pyproject.toml / setup.cfg without a TOML
+    lib (stdlib tomllib is 3.11+; we keep a regex fallback for portability)."""
+    deps: List[Any] = []
+    try:
+        import tomllib  # py3.11+
+        if name == "pyproject.toml":
+            data = tomllib.loads(src)
+            specs: List[str] = []
+            proj = data.get("project", {})
+            specs += list(proj.get("dependencies", []) or [])
+            for grp in (proj.get("optional-dependencies", {}) or {}).values():
+                specs += list(grp or [])
+            poetry = data.get("tool", {}).get("poetry", {})
+            for k, v in (poetry.get("dependencies", {}) or {}).items():
+                if k.lower() == "python":
+                    continue
+                specs.append(f"{k}=={v}" if isinstance(v, str) and v[:1].isdigit()
+                             else k)
+            for spec in specs:
+                deps += sc.parse_requirements(loc, str(spec))
+            return deps
+    except Exception:
+        pass
+    # Regex fallback: pull quoted "name<spec>" entries from a dependencies block.
+    block = re.search(r"dependencies\s*=\s*\[(.*?)\]", src, re.S)
+    if block:
+        for m in re.finditer(r"[\"']([^\"']+)[\"']", block.group(1)):
+            deps += sc.parse_requirements(loc, m.group(1))
+    return deps
+
+
+def _emit_dep_findings(report: Report, dep, advisories, popular,
+                       online: bool, timeout: float, sc) -> None:
+    # 1. Non-registry source.
+    if dep.nonregistry:
+        report.findings.append(Finding(
+            "supplychain.nonregistry_source", "medium",
+            f"Dependency '{dep.name}' is pulled from a non-registry source "
+            f"({dep.raw_spec}) — VCS/URL/local installs bypass registry "
+            "integrity checks and can be swapped silently.",
+            dep.location,
+            "Publish to (or mirror into) a trusted registry and pin by version "
+            "+ hash; avoid git+/url/file: installs in production."))
+
+    # 2. Known-vulnerable pinned version (offline DB + optional live OSV).
+    hits = sc.match_advisories(dep, advisories)
+    seen_ids = {h.get("id") for h in hits}
+    if online and dep.pinned_version:
+        for h in sc.osv_query_live(dep.name, dep.pinned_version,
+                                   dep.ecosystem, timeout=timeout):
+            if h.get("id") not in seen_ids:
+                hits.append(h)
+                seen_ids.add(h.get("id"))
+    for adv in hits:
+        report.findings.append(Finding(
+            "supplychain.known_vuln", sc._adv_severity(adv),
+            f"'{dep.name}=={dep.pinned_version}' is affected by "
+            f"{sc._adv_id(adv)}: {adv.get('summary', '')}",
+            dep.location,
+            "Upgrade past the fixed version; if pinned for reproducibility, "
+            "track the advisory and patch on the next review cycle."))
+
+    # 3. Unpinned (rug-pull window) — only when not a non-registry/exact pin.
+    if not dep.pinned_version and not dep.nonregistry:
+        report.findings.append(Finding(
+            "supplychain.unpinned", "low",
+            f"Dependency '{dep.name}' is not pinned to an exact version "
+            f"({dep.raw_spec}); a future malicious release enters the MCP "
+            "supply chain automatically (rug-pull window).",
+            dep.location,
+            "Pin == exact versions and commit a hash-locked lockfile so "
+            "updates are reviewed before they ship."))
+
+    # 4. Typosquat / dependency-confusion candidate.
+    cands = sc.typosquat_candidates(dep.name, dep.ecosystem, popular)
+    if cands:
+        report.findings.append(Finding(
+            "supplychain.typosquat", "medium",
+            f"Dependency '{dep.name}' is one edit away from popular package(s) "
+            f"{', '.join(cands)} but is not that package — possible "
+            "typosquat / dependency-confusion target.",
+            dep.location,
+            "Confirm this is the intended package and publisher; verify the "
+            "registry namespace and consider scoping internal packages."))
 
 
 # ==========================================================================

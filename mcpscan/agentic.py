@@ -59,6 +59,7 @@ _MS_TO_ASI = {
     "agent-impersonation": "ASI03",
     "agent-confused-deputy": "ASI03",
     "agent-knowledge-poisoning": "ASI06",
+    "agent-supply-chain": "ASI04",
     "agent-novel-logic-flaw": "ASI10",
 }
 # OWASP-LLM-Top-10 -> ASI (fallback when no MS taxonomy).

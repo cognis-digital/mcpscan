@@ -12,6 +12,7 @@ from .core import (
     Report,
     ScanError,
     SEVERITY_ORDER,
+    audit_dependencies,
     probe_endpoint,
     scan_path,
     scan_url,
@@ -32,11 +33,13 @@ _SEV_LABEL = {
 
 def _render_table(report: Report) -> str:
     lines: List[str] = []
-    kind = {"endpoint": "live endpoint", "url": "remote url"}.get(
-        report.target_kind, "source")
+    kind = {"endpoint": "live endpoint", "url": "remote url",
+            "deps": "dependency audit"}.get(report.target_kind, "source")
     lines.append(f"mcpscan — {kind}: {report.source}")
     if report.target_kind in ("source", "url"):
         lines.append(f"files scanned: {report.files_scanned}")
+    elif report.target_kind == "deps":
+        lines.append(f"manifests scanned: {report.files_scanned}")
     if report.ai_used:
         lines.append("AI: enabled (findings tagged [ai])")
     if report.ai_note:
@@ -176,6 +179,24 @@ def _build_parser() -> argparse.ArgumentParser:
                     help="Network timeout in seconds (default: 6).")
     _common(pr)
 
+    dp = sub.add_parser(
+        "deps",
+        help="Audit dependency manifests for ASI04 supply-chain risk "
+             "(known-vuln versions, unpinned/rug-pull, install hooks, "
+             "typosquat, missing lockfile).")
+    dp.add_argument("path", help="Path to the MCP server project (file or dir).")
+    dp.add_argument(
+        "--online", action="store_true",
+        help="OPT-IN: also query OSV.dev live for each pinned dependency. "
+             "OFF by default; offline uses the shipped advisory DB and is "
+             "byte-for-byte deterministic. Network failures degrade to offline.")
+    dp.add_argument("--advisory-db", metavar="PATH", default=None,
+                    help="Use a custom offline advisory DB JSON instead of the "
+                         "shipped one.")
+    dp.add_argument("--timeout", type=float, default=8.0,
+                    help="Per-package OSV.dev timeout in seconds (default: 8).")
+    _common(dp)
+
     tx = sub.add_parser("taxonomy",
                         help="Show the OWASP Top 10 for Agentic Applications (2026) mapping.")
     tx.add_argument("--format", choices=("table", "json"), default="table")
@@ -247,6 +268,19 @@ def _run_probe(args: argparse.Namespace) -> int:
     return _exit_code(report, args.fail_on)
 
 
+def _run_deps(args: argparse.Namespace) -> int:
+    try:
+        report = audit_dependencies(
+            args.path, online=getattr(args, "online", False),
+            advisory_db=getattr(args, "advisory_db", None),
+            timeout=getattr(args, "timeout", 8.0))
+    except ScanError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    _emit(report, args.format, args.out)
+    return _exit_code(report, args.fail_on)
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
@@ -256,6 +290,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _run_scan_url(args)
     if args.command == "probe":
         return _run_probe(args)
+    if args.command == "deps":
+        return _run_deps(args)
     if args.command == "taxonomy":
         return _run_taxonomy(args)
     parser.print_help(sys.stderr)
