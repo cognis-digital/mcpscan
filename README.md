@@ -39,6 +39,75 @@ current 2026 agentic-security standard.
 
 *AI Security & Governance — securing LLMs, agents, and the MCP supply chain.*
 
+
+<!-- cognis:example:start -->
+## 🔎 Example output
+
+Real, reproducible output from the tool — runs offline:
+
+```console
+$ mcpscan-emit --version
+mcpscan 0.6.0
+```
+
+```console
+$ mcpscan-emit --help
+usage: mcpscan [-h] [--version]
+               {scan,scan-url,passive,probe,deps,taxonomy} ...
+
+Scan MCP servers for the OWASP-LLM-Top-10 + MCP/agent threat surface
+(RCE/SSRF/path-traversal/deserialization/SSTI/secrets/tool-poisoning/confused-
+deputy/excessive-agency) — static source analysis (with AST taint dataflow) +
+live endpoint probe + remote URL scan, plus an opt-in AI review layer.
+
+positional arguments:
+  {scan,scan-url,passive,probe,deps,taxonomy}
+    scan                Statically scan a file/dir of MCP server source.
+    scan-url            Fetch a public GitHub / raw URL of an MCP server file
+                        and scan it.
+    passive             PASSIVE (default, OFFLINE): analyse a captured MCP
+                        tools/list JSON dump — no network traffic.
+    probe               ACTIVE (authorized-use only): send live tools/list to
+                        an MCP endpoint. OFF by default — needs --authorized +
+                        a scope.
+    deps                Audit dependency manifests for ASI04 supply-chain risk
+                        (known-vuln versions, unpinned/rug-pull, install
+                        hooks, typosquat, missing lockfile).
+    taxonomy            Show the OWASP Top 10 for Agentic Applications (2026)
+                        mapping.
+
+options:
+  -h, --help            show this help message and exit
+  --version             show program's version number and exit
+```
+
+> Blocks above are real `mcpscan` output — reproduce them from a clone.
+
+**Sample result format** _(illustrative values — run on your own data for real findings):_
+
+```
+{
+"findings": [
+    {
+        "id": "1234567890",
+        "title": "Suspicious Network Traffic",
+        "description": "Potential malicious activity detected on port 443.",
+        "created_by": "John Doe",
+        "created_at": "2023-02-15T14:30:00Z"
+    },
+    {
+        "id": "2345678901",
+        "title": "Unusual File Access",
+        "description": "User 'johndoe' accessed a file with suspicious permissions.",
+        "created_by": "Jane Smith",
+        "created_at": "2023-02-16T10:45:00Z"
+    }
+]
+}
+```
+
+<!-- cognis:example:end -->
+
 ## Passive (default) vs Active (authorized-use only)
 
 mcpscan is a **defensive, authorized-use-only** scanner with two operating
