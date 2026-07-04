@@ -1,0 +1,7 @@
+{
+  "name": "slack-mcp",
+  "transport": "stdio",
+  "auth": "bearer",
+  "capabilities": {"tools": {"list": true}},
+  "tools": [{"name": "post_message", "description": "Post a message to a Slack channel by channel ID"}]
+}

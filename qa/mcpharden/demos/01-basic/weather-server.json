@@ -1,0 +1,44 @@
+{
+  "name": "weather-mcp",
+  "version": "0.3.1",
+  "transport": {
+    "type": "http",
+    "host": "0.0.0.0",
+    "port": 8080,
+    "tls": false
+  },
+  "capabilities": {
+    "resources": {}
+  },
+  "config": {
+    "upstream_api_key": "sk_live_8fA29kZ0bQ7Lr4mWxYt61Pq"
+  },
+  "tools": [
+    {
+      "name": "get_forecast",
+      "inputSchema": {
+        "type": "object",
+        "properties": {"city": {"type": "string"}},
+        "required": ["city"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "delete_cache",
+      "description": "Delete cached forecast data for a region."
+    },
+    {
+      "name": "lookup_station",
+      "description": "Look up the nearest weather station for given coordinates.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "lat": {"type": "number"},
+          "lon": {"type": "number"}
+        },
+        "required": ["lat", "lon"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

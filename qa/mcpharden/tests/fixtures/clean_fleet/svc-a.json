@@ -1,0 +1,9 @@
+{
+  "name": "svc-a",
+  "transport": "stdio",
+  "auth": "oauth2",
+  "capabilities": {"tools": {"list": true}},
+  "tools": [
+    {"name": "a_search_tickets", "description": "Search Jira tickets by JQL in project ENGR."}
+  ]
+}

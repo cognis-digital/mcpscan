@@ -1,0 +1,7 @@
+{
+  "name": "github-mcp",
+  "transport": "http",
+  "auth": "none",
+  "capabilities": {"tools": {"list": true}},
+  "tools": [{"name": "github_api", "description": "Call the GitHub API"}]
+}

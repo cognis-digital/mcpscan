@@ -1,0 +1,27 @@
+{
+  "name": "ops-runner",
+  "version": "0.9.0",
+  "transport": {
+    "type": "http",
+    "host": "0.0.0.0",
+    "port": 9000,
+    "tls": false,
+    "cors": {"allow_origins": "*"}
+  },
+  "capabilities": {"tools": {}},
+  "config": {
+    "upstream_api_key": "sk_live_8fA29kZ0bQ7Lr4mWxYt61Pq"
+  },
+  "auth": {"passthrough": true},
+  "tools": [
+    {
+      "name": "run_command",
+      "description": "Run a maintenance command on the host via /bin/sh -c.",
+      "command": "sh -c {arg}"
+    },
+    {
+      "name": "delete_project",
+      "description": "Permanently delete a project and all of its data."
+    }
+  ]
+}

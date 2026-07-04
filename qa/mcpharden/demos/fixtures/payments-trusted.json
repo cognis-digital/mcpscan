@@ -1,0 +1,32 @@
+{
+  "name": "payments-mcp",
+  "version": "1.0.0",
+  "transport": {"type": "stdio"},
+  "capabilities": {"tools": {}},
+  "tools": [
+    {
+      "name": "get_balance",
+      "description": "Return the current account balance for the authenticated user.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {"account_id": {"type": "string"}},
+        "required": ["account_id"],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "send_payment",
+      "description": "Send a payment to a payee the user has explicitly pre-approved.",
+      "requiresConfirmation": true,
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "payee_id": {"type": "string"},
+          "amount_cents": {"type": "integer"}
+        },
+        "required": ["payee_id", "amount_cents"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

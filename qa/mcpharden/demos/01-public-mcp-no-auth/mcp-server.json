@@ -1,0 +1,10 @@
+{
+  "name": "public-data-server",
+  "transport": "http",
+  "auth": "none",
+  "capabilities": {},
+  "tools": [
+    {"name": "do_stuff", "description": "do misc things"},
+    {"name": "helper", "description": "helper"}
+  ]
+}

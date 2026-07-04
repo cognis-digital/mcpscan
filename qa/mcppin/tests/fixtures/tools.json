@@ -1,0 +1,22 @@
+{
+  "tools": [
+    {
+      "name": "read_file",
+      "description": "Read a file from disk.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "path": { "type": "string" } },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "search",
+      "description": "Search the web for a query.",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "q": { "type": "string" } },
+        "required": ["q"]
+      }
+    }
+  ]
+}

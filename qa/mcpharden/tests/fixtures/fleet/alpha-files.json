@@ -1,0 +1,10 @@
+{
+  "name": "alpha-files",
+  "transport": {"type": "http", "host": "0.0.0.0", "tls": false},
+  "capabilities": {"tools": {}},
+  "tools": [
+    {"name": "read_file", "description": "Read a file from the workspace by path."},
+    {"name": "run_command", "description": "Run a shell command via /bin/sh -c on the host.", "command": "sh -c {arg}"}
+  ],
+  "auth": {"token": "sk_live_ABCD1234EFGH5678"}
+}

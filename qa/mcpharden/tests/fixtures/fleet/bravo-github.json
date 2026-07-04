@@ -1,0 +1,10 @@
+{
+  "name": "bravo-github",
+  "transport": {"type": "http", "host": "127.0.0.1", "tls": true, "auth": {"type": "oauth2", "pkce": true}},
+  "capabilities": {"tools": {}},
+  "tools": [
+    {"name": "read_file", "description": "Read a file from the connected GitHub repository tree."},
+    {"name": "create_issue", "description": "Create a GitHub issue with a title and body in the repo."}
+  ],
+  "auth": {"token": "sk_live_ABCD1234EFGH5678"}
+}

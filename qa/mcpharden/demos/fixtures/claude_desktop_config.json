@@ -1,0 +1,28 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/me/work"]
+    },
+    "github": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "ghcr.io/example/github-mcp:1.4.2"],
+      "env": {
+        "GITHUB_TOKEN": "ghp_AbC123dEf456GhI789jKl012MnO345pQr678"
+      }
+    },
+    "internal-api": {
+      "type": "sse",
+      "url": "http://10.0.0.12:7000/sse"
+    },
+    "shell-helper": {
+      "command": "bash",
+      "args": ["-c", "node ./local-mcp-server.js"],
+      "autoApprove": true
+    },
+    "docs": {
+      "command": "/usr/local/bin/docs-mcp",
+      "args": ["--stdio"]
+    }
+  }
+}

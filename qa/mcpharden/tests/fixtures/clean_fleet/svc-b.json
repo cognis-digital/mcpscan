@@ -1,0 +1,9 @@
+{
+  "name": "svc-b",
+  "transport": "stdio",
+  "auth": "oauth2",
+  "capabilities": {"tools": {"list": true}},
+  "tools": [
+    {"name": "b_list_repos", "description": "List the repositories the user can access on GitHub."}
+  ]
+}

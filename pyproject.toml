@@ -4,15 +4,15 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cognis-mcpscan"
-version = "0.6.0"
-description = "Scan MCP servers for RCE/SSRF/no-auth/tool-poisoning vulnerabilities"
+version = "1.0.0"
+description = "The MCP-server security suite — scan, harden, gate, and pin your Model Context Protocol servers. 7 modules, one command."
 authors = [{name = "Cognis Digital", email = "suite@cognis.digital"}]
 license = {text = "LicenseRef-COCL-1.0"}
 requires-python = ">=3.10"
 readme = "README.md"
-keywords = ["ai-security", "mcp", "mcp-server", "cognis-digital", "cognis-neural-suite", "security"]
+keywords = ["ai-security", "mcp", "mcp-server", "model-context-protocol", "llm-security", "agent-security", "prompt-injection", "ssrf", "security"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -30,14 +30,28 @@ Homepage = "https://cognis.digital"
 Repository = "https://github.com/cognis-digital/mcpscan"
 
 [project.scripts]
+mcpscan = "mcpscan.suite:main"
 "mcpscan-emit" = "mcpscan.connect:emit_main"
-mcpscan = "mcpscan.cli:main"
+mcpharden = "mcpharden.cli:main"
+"mcpharden-emit" = "mcpharden.connect:emit_main"
+mcpauth = "mcpauth.cli:main"
+"mcpauth-emit" = "mcpauth.connect:emit_main"
+mcppin = "mcppin.cli:main"
+"mcppin-emit" = "mcppin.connect:emit_main"
+ssrfmcp = "ssrfmcp.cli:main"
+"ssrfmcp-emit" = "ssrfmcp.connect:emit_main"
+promptmirror = "promptmirror.cli:main"
+"promptmirror-emit" = "promptmirror.connect:emit_main"
+trustgate = "trustgate.cli:main"
+"trustgate-emit" = "trustgate.connect:emit_main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["mcpscan"]
-# Ship the offline supply-chain advisory DB + popular-package allowlist so
-# `mcpscan deps` works air-gapped straight from a pip install.
+packages = ['mcpscan', 'mcpharden', 'mcpauth', 'mcppin', 'ssrfmcp', 'promptmirror', 'trustgate']
 artifacts = ["mcpscan/data/*.json"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "qa"]
+addopts = "--import-mode=importlib"

@@ -1,0 +1,13 @@
+{
+  "name": "internal-jira-server",
+  "transport": "stdio",
+  "auth": "oauth2",
+  "capabilities": {
+    "tools": {"list": true},
+    "resources": {"list": true, "read": true}
+  },
+  "tools": [
+    {"name": "search_tickets", "description": "Search Jira tickets by JQL query in project ENGR"},
+    {"name": "create_ticket", "description": "Create a ticket in ENGR project with title, description, priority"}
+  ]
+}
