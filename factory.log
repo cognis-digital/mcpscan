@@ -1,0 +1,4 @@
+[2026-08-18 21:30:37] === enhance · mcpscan · words=120000 loc>=10000 langs=9 push=True ===
+[2026-08-18 21:30:43] phase DOCS — longform 120000-word corpus -> docs/corpus/
+[2026-08-19 06:36:18] phase POLYGLOT — expanding to >= 10000 LOC across 9 languages
+[2026-08-19 06:36:57]   facets: ['server_discovery', 'rce_detection', 'ssrf_detection', 'auth_bypass_check', 'tool_poisoning_scan', 'report_generator']
