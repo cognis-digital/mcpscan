@@ -2,3 +2,8 @@
 [2026-08-18 21:30:43] phase DOCS — longform 120000-word corpus -> docs/corpus/
 [2026-08-19 06:36:18] phase POLYGLOT — expanding to >= 10000 LOC across 9 languages
 [2026-08-19 06:36:57]   facets: ['server_discovery', 'rce_detection', 'ssrf_detection', 'auth_bypass_check', 'tool_poisoning_scan', 'report_generator']
+[2026-08-19 06:37:01] === done · mcpscan · loc=19430 · {'committed': True, 'pushed': True, 'push_err': ''} ===
+[2026-09-16 02:23:03] === enhance · mcpscan · words=120000 loc>=10000 langs=9 push=True ===
+[2026-09-16 02:23:07] phase DOCS — longform 120000-word corpus -> docs/corpus/
+[2026-09-16 08:25:41] phase POLYGLOT — expanding to >= 10000 LOC across 9 languages
+[2026-09-16 08:27:18]   facets: ['rce_handler_scanner', 'ssrf_request_tracker', 'auth_bypass_checker', 'tool_poison_detector', 'param_boundary_validator', 'response_sanitizer_checker']

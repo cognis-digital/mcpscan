@@ -101,3 +101,100 @@
 [2026-08-19 06:36:15]   [14] Frontier Research and Future Directions in MCP Sec — 5626w
 [2026-08-19 06:36:18] ASSEMBLED -> C:\Users\user\cognis-enhance\mcpscan\docs\corpus\mcpscan-engineering-compendium-reference\mcpscan-engineering-compendium-reference.md (82,789 words, 14 sections)
 [2026-08-19 06:36:18] === complete · 82,789 words -> C:\Users\user\cognis-enhance\mcpscan\docs\corpus\mcpscan-engineering-compendium-reference\mcpscan-engineering-compendium-reference.md ===
+[2026-09-16 02:23:07] === longform corpus · "mcpscan — Engineering Compendium & Reference" · target ~120,000w · 14 sections × 6 subs × ~1450w · slot=uncensored · web=off ===
+[2026-09-16 02:23:13] hw: free~9.1GB target~9.5GB evicted=[]
+[2026-09-16 02:23:56] outline: 14 sections
+[2026-09-16 02:30:07]     · Overview of MCP Server Components and Communic (1199w)
+[2026-09-16 02:35:55]     · Core Principles of MCP Server Operation and St (1136w)
+[2026-09-16 02:39:47]     · Network Layer Architecture and Data Flow in MC (870w)
+[2026-09-16 02:43:54]     · Security Model and Access Control Mechanisms i (862w)
+[2026-09-16 02:47:58]     · Scan Target Identification and Enumeration Tec (936w)
+[2026-09-16 02:51:44]     · Fundamental Concepts of Vulnerability Scanning (882w)
+[2026-09-16 02:51:44]   [01] Introduction to MCP Architecture and Scan Fundamen — 5948w
+[2026-09-16 02:51:47]   [02] MCP Server Communication Protocols and Vulnerabili — exists, skip
+[2026-09-16 02:56:16]     · Remote Code Execution via Unsanitized User Inp (870w)
+[2026-09-16 03:00:40]     · Exploitation of Insecure Deserialization in MC (1006w)
+[2026-09-16 03:03:49]     · Leveraging Misconfigured Server-Side Includes  (698w)
+[2026-09-16 03:07:54]     · Code Injection Through Dynamic Script Evaluati (893w)
+[2026-09-16 03:16:18]     · Abuse of External Libraries with Known Vulnera (1758w)
+[2026-09-16 03:20:18]     · RCE via Memory Corruption in MCP Core Modules (912w)
+[2026-09-16 03:20:18]   [03] RCE Exploitation Mechanisms in MCP Environments — 6192w
+[2026-09-16 03:29:57]     · Identification of Internal Resource Access Pat (2081w)
+[2026-09-16 03:34:42]     · Misconfigured Proxy and Redirect Handling Mech (990w)
+[2026-09-16 03:38:49]     · Bypassing Authentication via SSRF-Enabled Endp (932w)
+[2026-09-16 03:42:38]     · Leveraging Default or Hardcoded Server Endpoin (831w)
+[2026-09-16 03:46:13]     · Exploiting Insecure HTTP Client Implementation (842w)
+[2026-09-16 03:54:13]     · Case Studies: Real-World SSRF Exploits in MCP  (1605w)
+[2026-09-16 03:54:13]   [04] SSRF Vulnerabilities in MCP Server Configurations — 7331w
+[2026-09-16 03:59:12]     · Identifying No-Auth Endpoints via Static Analy (1006w)
+[2026-09-16 04:04:20]     · Dynamic Enumeration of Unauthenticated API End (1060w)
+[2026-09-16 04:13:52]     · Exploiting Default Configuration Files for Pat (2009w)
+[2026-09-16 04:17:28]     · Leveraging Misconfigured Session Management fo (767w)
+[2026-09-16 04:22:43]     · Automated Detection of No-Auth Resource Access (1151w)
+[2026-09-16 04:26:13]     · Case Studies: Real-World No-Auth Vulnerabiliti (783w)
+[2026-09-16 04:26:13]   [05] No-Authentication Path Enumeration and Privilege E — 6831w
+[2026-09-16 04:31:13]     · Definition and Scope of Tool Poisoning in MCP  (1060w)
+[2026-09-16 04:36:33]     · Mechanisms of Injection in Client Library Init (1165w)
+[2026-09-16 04:41:21]     · Dynamic Configuration Vulnerabilities in SDKs (1000w)
+[2026-09-16 04:45:51]     · Reflection and Class Loading Exploits in MCP C (999w)
+[2026-09-16 04:49:47]     · Dependency Chain Analysis for Tool Poisoning D (881w)
+[2026-09-16 04:55:03]     · Mitigation Strategies and Secure Coding Practi (1058w)
+[2026-09-16 04:55:03]   [06] Tool Poisoning in MCP Client Libraries and SDKs — 6224w
+[2026-09-16 04:59:23]     · Request Parsing and Header Injection Detection (910w)
+[2026-09-16 05:04:31]     · Session Management and Cookie Manipulation Ana (1086w)
+[2026-09-16 05:10:41]     · URL Redirection and SSRF Vulnerability Simulat (1323w)
+[2026-09-16 05:16:25]     · Input Validation and Payload Injection Testing (968w)
+[2026-09-16 05:22:20]     · Asynchronous Request Handling and Race Conditi (1002w)
+[2026-09-16 05:29:33]     · Resource Exhaustion and Concurrency Control Ev (1207w)
+[2026-09-16 05:29:33]   [07] Dynamic Analysis of MCP Server Request Handling — 6548w
+[2026-09-16 05:37:30]     · Syntax-Based Pattern Recognition in MCP Source (1122w)
+[2026-09-16 05:42:11]     · Control Flow Analysis for Unsanitized Input Ha (1041w)
+[2026-09-16 05:45:39]     · Memory Management and Buffer Overflow Detectio (784w)
+[2026-09-16 05:50:12]     · API Call Graph Traversal for SSRF and RCE Path (1057w)
+[2026-09-16 05:54:50]     · Authentication Bypass Heuristics in MCP Author (1069w)
+[2026-09-16 05:59:00]     · Tool Poisoning Indicators via Static Dependenc (967w)
+[2026-09-16 05:59:00]   [08] Static Code Analysis for MCP Vulnerability Pattern — 6100w
+[2026-09-16 06:04:11]     · TCP/IP Stack Behavior and Default Port Usage (1063w)
+[2026-09-16 06:08:25]     · HTTP/HTTPS Request Headers and Misconfigured R (830w)
+[2026-09-16 06:11:46]     · Session Management and Cookie Injection Vulner (752w)
+[2026-09-16 06:20:07]     · DNS Resolution and SSRF Attack Surface Analysi (1834w)
+[2026-09-16 06:25:04]     · TLS Cipher Suites and Insecure Protocol Versio (1030w)
+[2026-09-16 06:29:41]     · Server-Side Request Forgery (SSRF) Detection M (934w)
+[2026-09-16 06:29:41]   [09] Network Traffic Inspection for MCP Misconfiguratio — 6496w
+[2026-09-16 06:35:51]     · Architecture and Component Integration (1148w)
+[2026-09-16 06:41:46]     · Vulnerability Detection Module Design (1212w)
+[2026-09-16 06:46:09]     · Network Communication Protocol Handling (900w)
+[2026-09-16 06:50:42]     · Result Aggregation and Reporting Mechanisms (1003w)
+[2026-09-16 06:59:03]     · Performance Optimization Strategies (1786w)
+[2026-09-16 07:03:35]     · Security and Compliance Enforcement Layer (1062w)
+[2026-09-16 07:03:35]   [10] Automated Scan Framework Design for MCP Servers — 7151w
+[2026-09-16 07:09:21]     · Data Normalization and Structuring for SIEM Co (1180w)
+[2026-09-16 07:14:03]     · Real-Time Event Correlation with SIEM Systems (1088w)
+[2026-09-16 07:18:26]     · Integration of Scan Metadata into SOAR Playboo (975w)
+[2026-09-16 07:23:45]     · Custom Alert Generation and Rule Configuration (1214w)
+[2026-09-16 07:27:59]     · Automated Response Orchestration via SOAR Work (976w)
+[2026-09-16 07:32:15]     · Continuous Monitoring and Feedback Loops for V (975w)
+[2026-09-16 07:32:15]   [11] Integration of Scan Results with SIEM and SOAR Sys — 6465w
+[2026-09-16 07:37:37]     · Secure Session Management and Token Validation (1015w)
+[2026-09-16 07:42:43]     · Dynamic Input Sanitization and Context-Aware F (1163w)
+[2026-09-16 07:46:23]     · Runtime Policy Enforcement with MCP-Specific G (24w)
+[2026-09-16 07:47:10]     · Zero-Trust Architecture Integration for MCP Se (24w)
+[2026-09-16 07:49:49]     · Automated Vulnerability Patching and Dependenc (24w)
+[2026-09-16 07:52:55]     · Real-Time Monitoring and Anomaly Detection for (24w)
+[2026-09-16 07:52:55]   [12] Advanced Mitigation Strategies for MCP Vulnerabili — 2326w
+[2026-09-16 07:56:08]     · The 2019 MCP-07 RCE Incident: A Misconfigured  (24w)
+[2026-09-16 07:59:25]     · SSRF in MCP-12: How a Single Unvalidated Redir (24w)
+[2026-09-16 08:02:44]     · MCP-15's No-Auth Flaw: Exploiting Default Conf (24w)
+[2026-09-16 08:05:15]     · Tool Poisoning in MCP-21: A Misleading API Res (24w)
+[2026-09-16 08:07:58]     · The MCP-03 Post-Mortem: Lessons from a Zero-Da (24w)
+[2026-09-16 08:10:53]     · MCP-28's Unpatched Vulnerability Chain: How Ou (24w)
+[2026-09-16 08:10:53]   [13] Case Studies: Real-World MCP Exploits and Post-Mor — 227w
+[2026-09-16 08:13:40]     · Neural Network Architectures for Pattern Recog (24w)
+[2026-09-16 08:16:24]     · Reinforcement Learning for Adaptive Vulnerabil (24w)
+[2026-09-16 08:17:06]     · Natural Language Processing for Analyzing MCP  (24w)
+[2026-09-16 08:19:53]     · Federated Learning for Secure, Distributed MCP (24w)
+[2026-09-16 08:22:33]     · Generative Adversarial Networks for Simulating (24w)
+[2026-09-16 08:25:38]     · Hybrid AI-ML Models for Predictive Vulnerabili (24w)
+[2026-09-16 08:25:38]   [14] Frontier Research: AI-Driven MCP Vulnerability Det — 215w
+[2026-09-16 08:25:41] ASSEMBLED -> C:\Users\user\cognis-enhance\mcpscan\docs\corpus\mcpscan-engineering-compendium-reference\mcpscan-engineering-compendium-reference.md (150,843 words, 27 sections)
+[2026-09-16 08:25:41] === complete · 150,843 words -> C:\Users\user\cognis-enhance\mcpscan\docs\corpus\mcpscan-engineering-compendium-reference\mcpscan-engineering-compendium-reference.md ===
